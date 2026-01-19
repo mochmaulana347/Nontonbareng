@@ -3,55 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party - Final Edition</title>
+    <title>Watch Party - Happy Hues Edition</title>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        :root { --accent: #3b82f6; --bg: #0a0a0c; --panel: #111114; }
-        body { background: var(--bg); color: #fff; font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; height: 100vh; }
-        .app-container { display: flex; height: 100vh; }
+        /* Palet Warna Happy Hues (Style: Neon/Dark) */
+        :root {
+            --bg: #0f0e17;
+            --headline: #fffffe;
+            --paragraph: #a7a9be;
+            --button: #ff8906;
+            --button-text: #fffffe;
+            --accent: #f25f4c;
+            --tertiary: #e53170;
+            --card-bg: #16161a;
+        }
+
+        body { 
+            background: var(--bg); 
+            color: var(--paragraph); 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            margin: 0; 
+            overflow: hidden; 
+            height: 100vh; 
+        }
+
+        .app-container { display: flex; height: 100vh; width: 100vw; }
         
         /* Video Section */
-        .video-section { flex: 3; display: flex; flex-direction: column; padding: 20px; background: #000; position: relative; }
-        .nav-input { display: flex; gap: 10px; margin-bottom: 15px; z-index: 10; }
-        input { background: #1c1c21; border: 1px solid #333; padding: 12px; border-radius: 8px; color: #fff; outline: none; flex: 1; }
-        button { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; }
-        button:hover { opacity: 0.8; }
+        .video-section { 
+            flex: 3; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 20px; 
+            background: #000;
+        }
+
+        .nav-input { 
+            display: flex; 
+            gap: 12px; 
+            margin-bottom: 20px; 
+            z-index: 10;
+        }
+
+        input { 
+            background: var(--card-bg); 
+            border: 2px solid #242629; 
+            padding: 14px; 
+            border-radius: 12px; 
+            color: #fff; 
+            outline: none; 
+            flex: 1;
+            transition: 0.3s;
+        }
+        input:focus { border-color: var(--tertiary); }
+
+        button { 
+            background: var(--tertiary); 
+            color: var(--button-text); 
+            border: none; 
+            padding: 0 25px; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            font-weight: 800; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: 0.3s;
+        }
+        button:hover { transform: translateY(-2px); filter: brightness(1.2); box-shadow: 0 5px 15px rgba(229, 49, 112, 0.4); }
         
+        /* FIX VIDEO SIZE */
         .video-wrapper { 
             flex: 1; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            background: #000; 
-            border-radius: 12px; 
-            overflow: hidden; 
             position: relative;
-            width: 100%;
+            background: #000; 
+            border-radius: 20px; 
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .plyr { width: 100% !important; height: 100% !important; max-width: none !important; }
+
+        /* Memaksa Plyr mengisi seluruh area */
+        .plyr { 
+            width: 100% !important; 
+            height: 100% !important; 
+            max-width: none !important;
+        }
+        .plyr__video-wrapper { height: 100% !important; }
 
         /* Sidebar */
-        .sidebar { flex: 1; background: var(--panel); border-left: 1px solid #222; display: flex; flex-direction: column; padding: 20px; min-width: 350px; }
-        #user-list { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
-        .user-badge { background: #222; padding: 4px 10px; border-radius: 20px; font-size: 11px; color: #aaa; border: 1px solid #333; }
+        .sidebar { 
+            flex: 1; 
+            background: var(--card-bg); 
+            border-left: 1px solid #242629; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 25px; 
+            min-width: 380px; 
+        }
+
+        h2, h4 { color: var(--headline); margin-bottom: 15px; }
+
+        #user-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+        .user-badge { 
+            background: #242629; 
+            padding: 6px 14px; 
+            border-radius: 10px; 
+            font-size: 12px; 
+            font-weight: 600;
+            color: var(--paragraph);
+            border: 1px solid #333;
+        }
         
-        #chat-box { flex: 1; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 15px; border: 1px solid #222; margin-bottom: 15px; font-size: 14px; }
-        .msg { margin-bottom: 10px; line-height: 1.4; word-wrap: break-word; }
-        .msg b { color: var(--accent); }
+        #chat-box { 
+            flex: 1; 
+            overflow-y: auto; 
+            background: #0f0e17; 
+            border-radius: 15px; 
+            padding: 20px; 
+            border: 1px solid #242629; 
+            margin-bottom: 20px; 
+        }
+        .msg { margin-bottom: 12px; font-size: 14px; line-height: 1.5; }
+        .msg b { color: var(--tertiary); }
 
         /* Overlays */
-        #sync-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-        #login-overlay { position: fixed; inset: 0; background: #000; z-index: 200; display: flex; align-items: center; justify-content: center; }
+        #sync-overlay { 
+            position: absolute; inset: 0; background: rgba(15, 14, 23, 0.95); 
+            z-index: 100; display: none; flex-direction: column; align-items: center; 
+            justify-content: center; text-align: center; 
+        }
+        
+        #login-overlay { 
+            position: fixed; inset: 0; background: var(--bg); 
+            z-index: 200; display: flex; align-items: center; justify-content: center; 
+        }
+        .login-card {
+            background: var(--card-bg); padding: 50px; border-radius: 30px; 
+            border: 1px solid #242629; width: 350px; text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
     </style>
 </head>
 <body>
 
 <div id="login-overlay">
-    <div style="text-align:center; background:#111; padding:40px; border-radius:20px; border:1px solid #333; width: 300px;">
-        <h2 style="margin-top:0">Watch Party</h2>
-        <input type="text" id="nameInput" placeholder="Ketik namamu..." style="width:100%; margin-bottom:20px; box-sizing:border-box;">
-        <button onclick="join()" style="width:100%">Mulai Nonton</button>
+    <div class="login-card">
+        <h2>Watch Party</h2>
+        <p>Masukan nama untuk bergabung</p>
+        <input type="text" id="nameInput" placeholder="Nama kerenmu..." style="width:100%; margin-bottom:20px; box-sizing:border-box; text-align:center;">
+        <button onclick="join()" style="width:100%; height:50px;">Masuk Sekarang</button>
     </div>
 </div>
 
@@ -59,16 +162,130 @@
     <div class="video-section">
         <div class="nav-input">
             <input type="text" id="urlInput" placeholder="Tempel Link YouTube / MP4...">
-            <button onclick="changeVideo()">Putar</button>
+            <button onclick="changeVideo()">Ganti Video</button>
         </div>
         
         <div class="video-wrapper">
             <div id="sync-overlay">
-                <p style="font-size: 1.2rem; margin-bottom: 20px;">Video sedang berjalan di ruangan!</p>
-                <button onclick="startSync()" style="background:#22c55e; padding:15px 40px; font-size: 1.1rem;">GABUNG NONTON</button>
+                <h2 style="margin-bottom: 30px;">Video sedang diputar!</h2>
+                <button onclick="startSync()" style="background:var(--button); padding:20px 50px; font-size: 1.1rem; border-radius: 50px;">SINKRONKAN SEKARANG</button>
             </div>
             <div id="player" data-plyr-provider="youtube" data-plyr-embed-id="aqz-KE-bpKQ"></div>
         </div>
     </div>
 
-    <div
+    <div class="sidebar">
+        <h4>Penonton Aktif</h4>
+        <div id="user-list"></div>
+        
+        <h4>Obrolan</h4>
+        <div id="chat-box"></div>
+        
+        <div class="nav-input">
+            <input type="text" id="chatInput" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button onclick="sendChat()">Kirim</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+<script>
+    const socket = io();
+    // Inisialisasi Plyr dengan setting agar lebar penuh
+    let player = new Plyr('#player', { 
+        ratio: '16:9',
+        youtube: { noCookie: true, rel: 0, showinfo: 0, iv_load_policy: 3, modestbranding: 1 }
+    });
+
+    let isLock = false;
+    let initialData = null;
+
+    function join() {
+        const n = document.getElementById('nameInput').value;
+        if(n) { 
+            document.getElementById('login-overlay').style.display='none'; 
+            socket.emit('join-room', n); 
+        }
+    }
+
+    function startSync() {
+        document.getElementById('sync-overlay').style.display = 'none';
+        if(initialData) applyRemoteAction(initialData);
+    }
+
+    function changeVideo(url, fromRemote = false) {
+        const src = url || document.getElementById('urlInput').value;
+        if(!src) return;
+        
+        isLock = true;
+        const ytMatch = src.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/);
+        
+        if(ytMatch) {
+            player.source = { type: 'video', sources: [{ src: ytMatch[7], provider: 'youtube' }] };
+        } else {
+            player.source = { type: 'video', sources: [{ src: src, type: 'video/mp4' }] };
+        }
+
+        if(!fromRemote) socket.emit('video-command', { action: 'change', url: src, time: 0 });
+        setTimeout(() => isLock = false, 2500);
+    }
+
+    function applyRemoteAction(data) {
+        isLock = true;
+        if(data.action === 'change') changeVideo(data.url, true);
+
+        setTimeout(() => {
+            const diff = Math.abs(player.currentTime - data.time);
+            if (data.time !== undefined && diff > 3) {
+                player.currentTime = data.time;
+            }
+            if(data.action === 'play' || data.playing) player.play().catch(() => {});
+            else if(data.action === 'pause') player.pause();
+            
+            setTimeout(() => isLock = false, 1500);
+        }, 1500);
+    }
+
+    socket.on('video-command', (data) => {
+        if(data.action === 'initial-sync') {
+            initialData = data;
+            document.getElementById('sync-overlay').style.display = 'flex';
+        } else {
+            applyRemoteAction(data);
+        }
+    });
+
+    function sendCommand(action) {
+        if(isLock) return;
+        socket.emit('video-command', {
+            action: action,
+            url: document.getElementById('urlInput').value,
+            time: player.currentTime
+        });
+    }
+
+    player.on('play', () => sendCommand('play'));
+    player.on('pause', () => sendCommand('pause'));
+    player.on('seeked', () => sendCommand('seek'));
+
+    socket.on('update-users', (users) => {
+        document.getElementById('user-list').innerHTML = users.map(u => `<span class="user-badge">${u.name}</span>`).join('');
+    });
+
+    socket.on('chat-receive', (d) => {
+        const b = document.getElementById('chat-box');
+        b.innerHTML += `<div class="msg"><b>${d.user}</b>: ${d.msg}</div>`;
+        b.scrollTop = b.scrollHeight;
+    });
+
+    function sendChat() {
+        const i = document.getElementById('chatInput');
+        if(!i.value) return;
+        socket.emit('new-message', i.value);
+        document.getElementById('chat-box').innerHTML += `<div class="msg"><b>Kamu</b>: ${i.value}</div>`;
+        i.value = "";
+        document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
+    }
+</script>
+</body>
+</html>
