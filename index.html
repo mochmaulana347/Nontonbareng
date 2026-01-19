@@ -1,40 +1,137 @@
-const express = require('express');
-const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Party (No-Admin Edition)</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body { background: #0f0f12; color: #fff; font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
+        .main { flex: 3; display: flex; flex-direction: column; padding: 15px; background: #000; }
+        .sidebar { flex: 1; background: #151518; border-left: 1px solid #222; display: flex; flex-direction: column; padding: 15px; min-width: 300px; }
+        .video-wrapper { flex: 1; display: flex; align-items: center; justify-content: center; }
+        #chat-box { flex: 1; overflow-y: auto; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 14px; }
+        .input-group { display: flex; gap: 8px; margin-bottom: 10px; }
+        input { flex: 1; background: #222; border: 1px solid #333; padding: 10px; border-radius: 8px; color: #fff; outline: none; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        #login-overlay { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .plyr { width: 100%; border-radius: 12px; }
+    </style>
+</head>
+<body>
 
-app.use(express.static(__dirname));
+<div id="login-overlay">
+    <div style="text-align: center;">
+        <h2>Siapa Namamu?</h2>
+        <input type="text" id="nameInput" placeholder="Ketik nama..." style="width: 250px;">
+        <button onclick="join()">Masuk</button>
+    </div>
+</div>
 
-let users = {};
-let lastVideoState = { url: '', time: 0, playing: false };
+<div class="main">
+    <div class="input-group">
+        <input type="text" id="urlInput" placeholder="Tempel Link YouTube / MP4 / M3U8...">
+        <button onclick="changeSource()">Putar</button>
+    </div>
+    <div class="video-wrapper">
+        <video id="player" playsinline controls></video>
+    </div>
+</div>
 
-io.on('connection', (socket) => {
-    // Saat orang baru masuk
-    socket.on('join-room', (name) => {
-        users[socket.id] = { name: name };
-        io.emit('update-users', Object.values(users));
-        // Kirim status terakhir biar langsung sinkron
-        socket.emit('video-control', { ...lastVideoState, action: 'sync' });
-    });
+<div class="sidebar">
+    <div id="user-list" style="font-size: 12px; color: #888;"></div>
+    <div id="chat-box"></div>
+    <div class="input-group">
+        <input type="text" id="chatInput" placeholder="Chat..."><button onclick="sendChat()">Kirim</button>
+    </div>
+</div>
 
+<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+<script>
+    const socket = io();
+    const videoElement = document.querySelector('#player');
+    const player = new Plyr(videoElement, { ratio: '16:9' });
+    
+    let ignoreEvents = false; // Kunci biar ga ngeloop
+    let syncTimeout;
+
+    function join() {
+        const n = document.getElementById('nameInput').value;
+        if(n) { document.getElementById('login-overlay').style.display='none'; socket.emit('join-room', n); }
+    }
+
+    function changeSource(url, fromSocket = false) {
+        const target = url || document.getElementById('urlInput').value;
+        if(!target) return;
+        
+        const yt = target.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.*$/);
+        if(yt) {
+            const id = target.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/)[7];
+            player.source = { type: 'video', sources: [{ src: id, provider: 'youtube' }] };
+        } else if(target.includes('.m3u8')) {
+            if(Hls.isSupported()) { const h = new Hls(); h.loadSource(target); h.attachMedia(videoElement); }
+            else { videoElement.src = target; }
+        } else {
+            player.source = { type: 'video', sources: [{ src: target, type: 'video/mp4' }] };
+        }
+
+        if(!fromSocket) {
+            socket.emit('video-control', { action: 'change', url: target });
+        }
+    }
+
+    // FUNGSI PENGIRIM (Hanya kirim kalau tidak sedang menerima)
+    function emitControl(action) {
+        if(ignoreEvents) return;
+        socket.emit('video-control', {
+            action: action,
+            time: player.currentTime,
+            url: document.getElementById('urlInput').value
+        });
+    }
+
+    player.on('play', () => emitControl('play'));
+    player.on('pause', () => emitControl('pause'));
+    player.on('seeked', () => emitControl('seek'));
+
+    // MENERIMA PERINTAH (Kunci diaktifkan di sini)
     socket.on('video-control', (data) => {
-        // Simpan status terakhir di server
-        if (data.url) lastVideoState.url = data.url;
-        if (data.time !== undefined) lastVideoState.time = data.time;
-        lastVideoState.playing = (data.action === 'play');
+        ignoreEvents = true; // Kunci laporan keluar
+        clearTimeout(syncTimeout);
 
-        // Kirim ke semua orang KECUALI pengirimnya
-        socket.broadcast.emit('video-control', data);
+        if(data.action === 'change') changeSource(data.url, true);
+
+        setTimeout(() => {
+            if(data.time !== undefined && Math.abs(player.currentTime - data.time) > 2) {
+                player.currentTime = data.time;
+            }
+            if(data.action === 'play' || data.playing) player.play();
+            if(data.action === 'pause') player.pause();
+            
+            // Buka kunci setelah 3 detik stabil
+            syncTimeout = setTimeout(() => { ignoreEvents = false; }, 3000);
+        }, 1000);
     });
 
-    socket.on('new-message', (msg) => {
-        socket.broadcast.emit('chat-receive', { user: users[socket.id]?.name || "Anonim", msg });
+    socket.on('update-users', (users) => {
+        document.getElementById('user-list').innerText = "Penonton: " + users.map(u => u.name).join(', ');
     });
 
-    socket.on('disconnect', () => {
-        delete users[socket.id];
-        io.emit('update-users', Object.values(users));
+    socket.on('chat-receive', (d) => {
+        const b = document.getElementById('chat-box');
+        b.innerHTML += `<div><b>${d.user}:</b> ${d.msg}</div>`;
+        b.scrollTop = b.scrollHeight;
     });
-});
 
-http.listen(process.env.PORT || 3000);
+    function sendChat() {
+        const m = document.getElementById('chatInput').value;
+        if(!m) return;
+        socket.emit('new-message', m);
+        document.getElementById('chat-box').innerHTML += `<div><b>Kamu:</b> ${m}</div>`;
+        document.getElementById('chatInput').value = "";
+    }
+</script>
+</body>
+</html>
