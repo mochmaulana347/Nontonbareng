@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party - Pro Edition</title>
+    <title>Watch Party - Final Edition</title>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <style>
@@ -13,33 +13,44 @@
         
         /* Video Section */
         .video-section { flex: 3; display: flex; flex-direction: column; padding: 20px; background: #000; position: relative; }
-        .nav-input { display: flex; gap: 10px; margin-bottom: 15px; }
+        .nav-input { display: flex; gap: 10px; margin-bottom: 15px; z-index: 10; }
         input { background: #1c1c21; border: 1px solid #333; padding: 12px; border-radius: 8px; color: #fff; outline: none; flex: 1; }
-        button { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        button { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        button:hover { opacity: 0.8; }
         
-        .video-wrapper { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 12px; overflow: hidden; position: relative; }
-        
+        .video-wrapper { 
+            flex: 1; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background: #000; 
+            border-radius: 12px; 
+            overflow: hidden; 
+            position: relative;
+            width: 100%;
+        }
+        .plyr { width: 100% !important; height: 100% !important; max-width: none !important; }
+
         /* Sidebar */
-        .sidebar { flex: 1; background: var(--panel); border-left: 1px solid #222; display: flex; flex-direction: column; padding: 20px; min-width: 320px; }
+        .sidebar { flex: 1; background: var(--panel); border-left: 1px solid #222; display: flex; flex-direction: column; padding: 20px; min-width: 350px; }
         #user-list { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
         .user-badge { background: #222; padding: 4px 10px; border-radius: 20px; font-size: 11px; color: #aaa; border: 1px solid #333; }
         
         #chat-box { flex: 1; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 15px; border: 1px solid #222; margin-bottom: 15px; font-size: 14px; }
-        .msg { margin-bottom: 10px; line-height: 1.4; }
+        .msg { margin-bottom: 10px; line-height: 1.4; word-wrap: break-word; }
         .msg b { color: var(--accent); }
 
-        /* Initial Sync Overlay */
-        #sync-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-        
+        /* Overlays */
+        #sync-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
         #login-overlay { position: fixed; inset: 0; background: #000; z-index: 200; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
 <div id="login-overlay">
-    <div style="text-align:center; background:#111; padding:40px; border-radius:20px; border:1px solid #333;">
+    <div style="text-align:center; background:#111; padding:40px; border-radius:20px; border:1px solid #333; width: 300px;">
         <h2 style="margin-top:0">Watch Party</h2>
-        <input type="text" id="nameInput" placeholder="Namamu..." style="width:100%; margin-bottom:20px; box-sizing:border-box;">
+        <input type="text" id="nameInput" placeholder="Ketik namamu..." style="width:100%; margin-bottom:20px; box-sizing:border-box;">
         <button onclick="join()" style="width:100%">Mulai Nonton</button>
     </div>
 </div>
@@ -53,118 +64,11 @@
         
         <div class="video-wrapper">
             <div id="sync-overlay">
-                <p>Video sedang diputar di ruangan ini.</p>
-                <button onclick="startSync()" style="background:#22c55e; padding:15px 30px;">GABUNG NONTON</button>
+                <p style="font-size: 1.2rem; margin-bottom: 20px;">Video sedang berjalan di ruangan!</p>
+                <button onclick="startSync()" style="background:#22c55e; padding:15px 40px; font-size: 1.1rem;">GABUNG NONTON</button>
             </div>
             <div id="player" data-plyr-provider="youtube" data-plyr-embed-id="aqz-KE-bpKQ"></div>
         </div>
     </div>
 
-    <div class="sidebar">
-        <div style="font-size: 12px; color:#666; margin-bottom:5px;">PENONTON</div>
-        <div id="user-list"></div>
-        
-        <div id="chat-box"></div>
-        
-        <div class="nav-input">
-            <input type="text" id="chatInput" placeholder="Chat...">
-            <button onclick="sendChat()">Kirim</button>
-        </div>
-    </div>
-</div>
-
-<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
-<script>
-    const socket = io();
-    let player = new Plyr('#player', { ratio: '16:9' });
-    let isLock = false;
-    let initialData = null;
-
-    function join() {
-        const n = document.getElementById('nameInput').value;
-        if(n) { 
-            document.getElementById('login-overlay').style.display='none'; 
-            socket.emit('join-room', n); 
-        }
-    }
-
-    function startSync() {
-        document.getElementById('sync-overlay').style.display = 'none';
-        if(initialData) applyRemoteAction(initialData);
-    }
-
-    function changeVideo(url, fromRemote = false) {
-        const src = url || document.getElementById('urlInput').value;
-        if(!src) return;
-        
-        isLock = true;
-        const isYoutube = src.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.*$/);
-        if(isYoutube) {
-            const ytId = src.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/)[7];
-            player.source = { type: 'video', sources: [{ src: ytId, provider: 'youtube' }] };
-        } else {
-            player.source = { type: 'video', sources: [{ src: src, type: 'video/mp4' }] };
-        }
-        if(!fromRemote) socket.emit('video-command', { action: 'change', url: src, time: 0 });
-        setTimeout(() => isLock = false, 2000);
-    }
-
-    function applyRemoteAction(data) {
-        isLock = true;
-        if(data.action === 'change') changeVideo(data.url, true);
-
-        setTimeout(() => {
-            if(data.time !== undefined && Math.abs(player.currentTime - data.time) > 3) {
-                player.currentTime = data.time;
-            }
-            if(data.action === 'play' || data.playing) player.play();
-            else if(data.action === 'pause') player.pause();
-            
-            setTimeout(() => isLock = false, 1500);
-        }, 1200);
-    }
-
-    socket.on('video-command', (data) => {
-        if(data.action === 'initial-sync') {
-            initialData = data;
-            document.getElementById('sync-overlay').style.display = 'flex';
-        } else {
-            applyRemoteAction(data);
-        }
-    });
-
-    // Aksi Fisik
-    function sendCommand(action) {
-        if(isLock) return;
-        socket.emit('video-command', {
-            action: action,
-            url: document.getElementById('urlInput').value,
-            time: player.currentTime
-        });
-    }
-
-    player.on('play', () => sendCommand('play'));
-    player.on('pause', () => sendCommand('pause'));
-    player.on('seeked', () => sendCommand('seek'));
-
-    // UI Updates
-    socket.on('update-users', (users) => {
-        document.getElementById('user-list').innerHTML = users.map(u => `<span class="user-badge">${u.name}</span>`).join('');
-    });
-
-    socket.on('chat-receive', (d) => {
-        const b = document.getElementById('chat-box');
-        b.innerHTML += `<div class="msg"><b>${d.user}:</b> ${d.msg}</div>`;
-        b.scrollTop = b.scrollHeight;
-    });
-
-    function sendChat() {
-        const i = document.getElementById('chatInput');
-        if(!i.value) return;
-        socket.emit('new-message', i.value);
-        document.getElementById('chat-box').innerHTML += `<div class="msg"><b>Kamu:</b> ${i.value}</div>`;
-        i.value = "";
-    }
-</script>
-</body>
-</html>
+    <div
