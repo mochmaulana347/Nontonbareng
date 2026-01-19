@@ -3,238 +3,145 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Watch Party Pro</title>
+<title>Watch Party</title>
 <script src="/socket.io/socket.io.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://www.youtube.com/iframe_api"></script>
 
 <style>
-:root {
-  --bg: #0f172a;
-  --card: #1e293b;
-  --primary: #38bdf8;
-  --accent: #22c55e;
-  --danger: #f87171;
-  --text: #e5e7eb;
-  --muted: #94a3b8;
+:root{
+--bg:#0f172a;--surface:#111827;--soft:#1f2937;
+--text:#f8fafc;--muted:#94a3b8;
+--primary:#38bdf8;--accent:#22c55e;--border:#1e293b;
 }
-
-* { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  font-family: Inter, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  height: 100vh;
-  display: flex;
+*{box-sizing:border-box}
+body{
+margin:0;background:var(--bg);color:var(--text);
+font-family:system-ui,-apple-system,sans-serif;height:100vh;
 }
+.app{display:flex;height:100vh}
+.video{flex:3;display:flex;flex-direction:column;padding:12px}
+.video-box{flex:1;border-radius:16px;overflow:hidden;
+box-shadow:0 0 40px rgba(56,189,248,.25)}
+#player{width:100%;height:100%}
 
-#login {
-  position: fixed;
-  inset: 0;
-  background: var(--bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
+.side{
+flex:1;min-width:280px;
+background:var(--surface);border-left:1px solid var(--border);
+display:flex;flex-direction:column;padding:12px
 }
-
-.login-card {
-  background: var(--card);
-  padding: 30px;
-  border-radius: 16px;
-  width: 280px;
-  text-align: center;
+.users{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.user{
+padding:4px 10px;border-radius:999px;
+background:var(--soft);font-size:12px;color:var(--muted)
 }
+.user.watch{color:var(--accent)}
 
-input, button {
-  width: 100%;
-  padding: 10px;
-  margin-top: 10px;
-  border-radius: 10px;
-  border: none;
-  font-size: 14px;
+.chat{flex:1;overflow:auto;background:var(--bg);
+border-radius:12px;padding:10px;border:1px solid var(--border)}
+.msg{margin-bottom:8px}
+.me{color:var(--primary)}
+
+.input{display:flex;gap:6px;margin-top:8px}
+input,button{
+border-radius:10px;border:1px solid var(--border);
+padding:10px;background:var(--soft);color:white
 }
+button{background:var(--primary);color:black;font-weight:700}
 
-input {
-  background: #020617;
-  color: var(--text);
-}
-
-button {
-  background: var(--primary);
-  color: #020617;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.app {
-  display: flex;
-  width: 100%;
-}
-
-.video {
-  flex: 3;
-  display: flex;
-  flex-direction: column;
-}
-
-.topbar {
-  padding: 12px;
-  background: var(--card);
-  display: flex;
-  gap: 10px;
-}
-
-#player {
-  flex: 1;
-}
-
-.sidebar {
-  flex: 1;
-  background: var(--card);
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
-  gap: 12px;
-}
-
-.users, .chat {
-  background: #020617;
-  border-radius: 12px;
-  padding: 10px;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.user {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  margin-bottom: 6px;
-}
-
-.status {
-  font-size: 11px;
-}
-
-.watch { color: var(--accent); }
-.idle { color: var(--danger); }
-
-.chat-msg {
-  font-size: 13px;
-  margin-bottom: 6px;
-}
-
-.chat-input {
-  display: flex;
-  gap: 6px;
+@media(max-width:768px){
+.app{flex-direction:column}
+.side{min-width:unset;height:40vh}
 }
 </style>
 </head>
+
 <body>
 
-<div id="login">
-  <div class="login-card">
-    <h3>Watch Party</h3>
-    <input id="name" placeholder="Nickname">
-    <button onclick="join()">Masuk</button>
-  </div>
+<div id="login" style="position:fixed;inset:0;background:var(--bg);
+display:flex;align-items:center;justify-content:center;z-index:9">
+<div style="background:var(--surface);padding:30px;border-radius:20px">
+<h2>Watch Party</h2>
+<input id="name" placeholder="Nama" style="width:100%;margin-bottom:10px">
+<button onclick="join()">Masuk</button>
+</div>
 </div>
 
 <div class="app">
-  <div class="video">
-    <div class="topbar">
-      <input id="vid" placeholder="YouTube Video ID">
-      <button onclick="start()">Start</button>
-      <button onclick="userPlay()">▶ Play</button>
-    </div>
-    <div id="player"></div>
-  </div>
+<div class="video">
+<div class="video-box"><div id="player"></div></div>
+</div>
 
-  <div class="sidebar">
-    <div class="users" id="users"></div>
-    <div class="chat" id="chat"></div>
-    <div class="chat-input">
-      <input id="chatText" placeholder="Ketik pesan...">
-      <button onclick="sendChat()">Kirim</button>
-    </div>
-  </div>
+<div class="side">
+<div class="users" id="users"></div>
+<div class="chat" id="chat"></div>
+<div class="input">
+<input id="chatInput" placeholder="Chat..." onkeydown="if(event.key=='Enter')send()">
+<button onclick="send()">Kirim</button>
+</div>
+</div>
 </div>
 
 <script>
-const socket = io();
-let player;
+const socket=io();
+let player,isSync=false,myName="";
 
-// YT API
-const tag = document.createElement("script");
-tag.src = "https://www.youtube.com/iframe_api";
-document.body.appendChild(tag);
-
-function onYouTubeIframeAPIReady() {
-  player = new YT.Player("player", { videoId: "dQw4w9WgXcQ" });
+function join(){
+myName=name.value;
+login.style.display="none";
+socket.emit("join-room",myName);
 }
 
-function join() {
-  const n = document.getElementById("name").value;
-  if (!n) return;
-  socket.emit("join", n);
-  document.getElementById("login").style.display = "none";
+function onYouTubeIframeAPIReady(){
+player=new YT.Player("player",{
+videoId:"dQw4w9WgXcQ",
+events:{onStateChange:e=>{
+if(isSync)return;
+socket.emit("video-command",{
+time:player.getCurrentTime(),
+playing:e.data===1
+});
+}}
+});
 }
 
-function userPlay() {
-  player.playVideo().catch(()=>{});
+socket.on("init-state",d=>wait(()=>sync(d)));
+socket.on("video-sync",d=>sync(d));
+
+function sync(d){
+isSync=true;
+if(player.getVideoData().video_id!==d.vid)
+player.loadVideoById(d.vid,d.time);
+else if(Math.abs(player.getCurrentTime()-d.time)>2)
+player.seekTo(d.time,true);
+d.playing?player.playVideo():player.pauseVideo();
+setTimeout(()=>isSync=false,1200);
 }
 
-function start() {
-  const vid = document.getElementById("vid").value;
-  if (!vid) return;
-  player.loadVideoById(vid);
-  socket.emit("start-video", { vid, time: 0 });
-}
-
-// sync time only
-socket.on("video-sync", (s) => {
-  if (!player || !s.startedAt) return;
-
-  const t = (Date.now() - s.startedAt) / 1000;
-  const diff = t - player.getCurrentTime();
-  if (Math.abs(diff) > 1) player.seekTo(t, true);
+socket.on("user-list",list=>{
+users.innerHTML=list.map(u=>
+`<span class="user ${u.state==="watching"?"watch":""}">● ${u.name}</span>`
+).join("");
 });
 
-// presence detect
-document.addEventListener("visibilitychange", () => {
-  socket.emit("presence", {
-    active: !document.hidden,
-    watching: !player?.isMuted()
-  });
-});
-
-socket.on("users-update", (list) => {
-  const box = document.getElementById("users");
-  box.innerHTML = "";
-  Object.values(list).forEach(u => {
-    box.innerHTML += `
-      <div class="user">
-        <span>${u.name}</span>
-        <span class="status ${u.active ? "watch" : "idle"}">
-          ${u.active ? "🎬 nonton" : "🟡 tab lain"}
-        </span>
-      </div>`;
-  });
-});
-
-function sendChat() {
-  const t = document.getElementById("chatText");
-  if (!t.value) return;
-  socket.emit("chat-send", t.value);
-  t.value = "";
+function send(){
+if(!chatInput.value)return;
+chat.innerHTML+=`<div class="msg me"><b>Kamu:</b> ${chatInput.value}</div>`;
+socket.emit("chat-send",chatInput.value);
+chatInput.value="";
+chat.scrollTop=9999;
 }
 
-socket.on("chat-receive", (d) => {
-  const c = document.getElementById("chat");
-  c.innerHTML += `<div class="chat-msg"><b>${d.user}:</b> ${d.msg}</div>`;
-  c.scrollTop = c.scrollHeight;
+socket.on("chat-receive",d=>{
+chat.innerHTML+=`<div class="msg"><b>${d.user}:</b> ${d.msg}</div>`;
+chat.scrollTop=9999;
+});
+
+function wait(fn){
+let t=setInterval(()=>player&&player.playVideo&&(fn(),clearInterval(t)),300);
+}
+
+document.addEventListener("visibilitychange",()=>{
+socket.emit("user-state",document.hidden?"idle":"watching");
 });
 </script>
 </body>
