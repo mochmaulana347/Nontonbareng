@@ -3,119 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party - Smart Estafet</title>
+    <title>Watch Party - Final Logic</title>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        .nav { padding: 15px; display: flex; gap: 10px; background: #111; border-bottom: 1px solid #333; }
-        input { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #444; background: #222; color: #fff; outline: none; }
+        .nav { padding: 15px; display: flex; gap: 10px; background: #111; z-index: 10; }
+        input { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #333; background: #222; color: #fff; }
         button { padding: 10px 20px; background: #3b82f6; border: none; color: #fff; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .video-container { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
-        #sync-btn { position: absolute; z-index: 10; padding: 15px 30px; background: #22c55e; border-radius: 50px; font-size: 18px; display: none; }
+        #overlay-sync { position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 20; display: none; flex-direction: column; align-items: center; justify-content: center; }
         .plyr { width: 100%; max-width: 1000px; }
     </style>
 </head>
 <body>
 
 <div class="nav">
-    <input type="text" id="urlInput" placeholder="Tempel link video (YouTube/Direct/M3U8)...">
+    <input type="text" id="urlInput" placeholder="Tempel link YouTube atau MP4...">
     <button onclick="changeVideo()">Putar</button>
 </div>
 
 <div class="video-container">
-    <button id="sync-btn" onclick="startSync()">Klik untuk Sinkron</button>
-    <video id="player" playsinline controls></video>
+    <div id="overlay-sync">
+        <h3 id="status-msg">Menghubungkan ke Room...</h3>
+        <button onclick="startWatching()" style="background: #22c55e; padding: 15px 40px; font-size: 1.2rem;">GABUNG NONTON</button>
+    </div>
+    <div id="player-wrapper" style="width: 100%; max-width: 1000px;">
+        <div id="player" data-plyr-provider="youtube" data-plyr-embed-id="aqz-KE-bpKQ"></div>
+    </div>
 </div>
 
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <script>
     const socket = io();
-    const v = document.getElementById('player');
-    const player = new Plyr(v, { ratio: '16:9' });
-    const syncBtn = document.getElementById('sync-btn');
+    let player = new Plyr('#player', { ratio: '16:9' });
+    let isLock = false; 
+    let initialData = null;
 
-    let isLock = false; // Kunci Anti-Feedback Loop
-    let lastData = null;
-
-    // Join room saat pertama kali buka
+    // 1. Join Room & Minta Status
     socket.emit('join-room');
 
-    function startSync() {
-        syncBtn.style.display = 'none';
-        if (lastData) applyCommand(lastData);
+    socket.on('video-command', (data) => {
+        if (data.action === 'initial-sync') {
+            initialData = data;
+            document.getElementById('overlay-sync').style.display = 'flex';
+            document.getElementById('status-msg').innerText = "Video sedang berjalan!";
+        } else {
+            applyRemoteAction(data);
+        }
+    });
+
+    // 2. Klik Tombol Gabung Nonton (Initial Sync)
+    function startWatching() {
+        document.getElementById('overlay-sync').style.display = 'none';
+        if (initialData) {
+            applyRemoteAction(initialData);
+        }
     }
 
+    // 3. Fungsi Ganti Video
     function changeVideo(url, fromRemote = false) {
         const src = url || document.getElementById('urlInput').value;
         if (!src) return;
 
-        if (src.includes('.m3u8')) {
-            if (Hls.isSupported()) {
-                const hls = new Hls(); hls.loadSource(src); hls.attachMedia(v);
-            } else { v.src = src; }
+        isLock = true;
+        const isYoutube = src.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.*$/);
+        
+        if (isYoutube) {
+            const ytId = src.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/)[7];
+            player.source = { type: 'video', sources: [{ src: ytId, provider: 'youtube' }] };
         } else {
-            player.source = { type: 'video', sources: [{ src: src }] };
+            player.source = { type: 'video', sources: [{ src: src, type: 'video/mp4' }] };
         }
 
-        if (!fromRemote) {
-            sendCommand('change', src, 0);
-        }
-    }
-
-    // Fungsi Pengirim (Hanya kirim jika tidak sedang terkunci)
-    function sendCommand(action, url = null, time = null) {
-        if (isLock) return;
-        socket.emit('video-command', {
-            action: action,
-            url: url || document.getElementById('urlInput').value,
-            time: time !== null ? time : player.currentTime
-        });
-    }
-
-    // Event Listeners (Aksi Fisik)
-    player.on('play', () => sendCommand('play'));
-    player.on('pause', () => sendCommand('pause'));
-    player.on('seeked', () => sendCommand('seek'));
-
-    // Eksekusi perintah dari server
-    function applyCommand(data) {
-        isLock = true; // Kunci pintu keluar!
-
-        if (data.url && data.url !== document.getElementById('urlInput').value) {
-            changeVideo(data.url, true);
-        }
-
-        setTimeout(() => {
-            const diff = Math.abs(player.currentTime - data.time);
-            if (data.time !== undefined && diff > 2) {
-                player.currentTime = data.time;
-            }
-
-            if (data.action === 'play' || data.playing) {
-                player.play().catch(() => {
-                    syncBtn.style.display = 'block'; // Munculkan tombol jika autoplay diblokir
-                });
-            } else if (data.action === 'pause') {
-                player.pause();
-            }
-
-            // Buka kunci setelah 1 detik stabil
-            setTimeout(() => { isLock = false; }, 1000);
-        }, 800);
-    }
-
-    // Menerima perintah dari orang lain atau sinkronisasi awal
-    socket.on('video-command', (data) => {
-        applyCommand(data);
-    });
-
-    socket.on('sync-join', (data) => {
-        lastData = data;
-        syncBtn.style.display = 'block'; // Paksa user klik sekali agar browser izinkan suara & play
-    });
-
-</script>
-</body>
-</html>
+        if
