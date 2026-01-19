@@ -6,7 +6,6 @@
     <title>Watch Party Cinematic</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* CSS DESAIN CINEMATIC */
         body {
             background-color: #050505;
             color: #ffffff;
@@ -16,12 +15,10 @@
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
-            overflow-x: hidden;
         }
 
-        /* Container Utama di Tengah */
         .main-container {
-            width: 90%;
+            width: 95%;
             max-width: 900px;
             margin-top: 30px;
             text-align: center;
@@ -29,7 +26,6 @@
 
         h1 {
             font-weight: 800;
-            letter-spacing: -1px;
             background: linear-gradient(to right, #3b82f6, #8b5cf6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -39,7 +35,7 @@
         /* Player YouTube di Tengah */
         .video-wrapper {
             position: relative;
-            padding-bottom: 56.25%; /* Ratio 16:9 */
+            padding-bottom: 56.25%;
             height: 0;
             overflow: hidden;
             border-radius: 20px;
@@ -57,7 +53,7 @@
             border: none;
         }
 
-        /* Panel Kontrol & Chat */
+        /* Panel Kontrol */
         .controls-panel {
             background: rgba(30, 30, 30, 0.6);
             backdrop-filter: blur(10px);
@@ -82,10 +78,7 @@
             border-radius: 12px;
             color: white;
             outline: none;
-            transition: 0.3s;
         }
-
-        input:focus { border-color: #3b82f6; }
 
         button {
             background: #3b82f6;
@@ -95,14 +88,12 @@
             border-radius: 12px;
             font-weight: 600;
             cursor: pointer;
-            transition: 0.3s;
         }
 
-        button:hover { background: #2563eb; transform: translateY(-2px); }
+        button:hover { background: #2563eb; }
 
-        /* Chat Box */
         #chat-box {
-            height: 150px;
+            height: 120px;
             overflow-y: auto;
             text-align: left;
             padding: 10px;
@@ -111,7 +102,7 @@
             font-size: 14px;
         }
 
-        .msg { margin-bottom: 8px; line-height: 1.4; }
+        .msg { margin-bottom: 8px; }
         .msg span { color: #3b82f6; font-weight: bold; }
     </style>
 </head>
@@ -126,14 +117,14 @@
 
         <div class="controls-panel">
             <div class="input-group">
-                <input type="text" id="urlInput" placeholder="Tempel ID YouTube (contoh: dQw4w9WgXcQ)">
-                <button onclick="changeVideo()">Ganti Video</button>
+                <input type="text" id="urlInput" placeholder="Tempel Link YouTube di sini (Bisa Link Browser atau Share)">
+                <button onclick="changeVideo()">Putar Video</button>
             </div>
 
             <div id="chat-box"></div>
 
             <div class="input-group">
-                <input type="text" id="chatInput" placeholder="Ketik pesan obrolan...">
+                <input type="text" id="chatInput" placeholder="Ketik pesan...">
                 <button onclick="sendChat()">Kirim</button>
             </div>
         </div>
@@ -143,7 +134,13 @@
         const socket = io();
         let player, isSyncing = false;
 
-        // Load API YouTube
+        // FUNGSI CANGGIH: Ambil ID dari Link YouTube apapun
+        function extractVideoID(url) {
+            const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[7].length == 11) ? match[7] : url;
+        }
+
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         document.body.appendChild(tag);
@@ -151,7 +148,6 @@
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
                 height: '100%', width: '100%', videoId: 'dQw4w9WgXcQ',
-                playerVars: { 'rel': 0, 'modestbranding': 1 },
                 events: { 'onStateChange': onPlayerStateChange }
             });
         }
@@ -164,10 +160,15 @@
         }
 
         function changeVideo() {
-            const vid = document.getElementById('urlInput').value;
-            if(!vid) return;
+            const rawUrl = document.getElementById('urlInput').value;
+            if(!rawUrl) return;
+            
+            // Ambil ID dari link yang ditempel
+            const vid = extractVideoID(rawUrl);
+            
             socket.emit('video-control', { action: 'change', vid });
             player.loadVideoById(vid);
+            document.getElementById('urlInput').value = ""; // Bersihkan kolom
         }
 
         function sendChat() {
