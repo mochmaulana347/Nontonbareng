@@ -1,130 +1,100 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nobar</title>
 <script src="/socket.io/socket.io.js"></script>
-
 <style>
-:root{
-  --bg:#0f172a; --card:#111827; --primary:#6366f1;
-  --accent:#22c55e; --warn:#f59e0b; --danger:#ef4444;
+body {
+  font-family: sans-serif;
+  background:#f9fafb;
+  margin:0;
 }
-body{margin:0;background:var(--bg);color:#e5e7eb;font-family:sans-serif}
-.top{padding:12px;display:flex;gap:8px;background:var(--card)}
-input,button{padding:10px;border-radius:10px;border:none}
-button{background:var(--primary);color:white;font-weight:600}
-#player{height:55vh;background:black}
-.side{background:var(--card);height:45vh;display:flex;flex-direction:column}
-.users,.chat{padding:10px;overflow:auto}
-.chat-input{display:flex;gap:6px;padding:10px}
-.user.watching{color:var(--accent)}
-.user.idle{color:var(--warn)}
-.user.away{color:var(--danger)}
+#joinBox {
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:white;
+}
+#app { display:none; padding:12px }
+video, iframe {
+  width:100%;
+  max-height:60vh;
+  background:black;
+}
+.user { font-size:12px }
 </style>
 </head>
-
 <body>
 
-<!-- LOGIN SEKALI -->
-<div id="login" style="position:fixed;inset:0;background:#000c;display:flex;align-items:center;justify-content:center">
-  <div style="background:var(--card);padding:20px;border-radius:16px">
-    <input id="name" placeholder="Nickname">
-    <button onclick="start()">Masuk</button>
+<div id="joinBox">
+  <div>
+    <h3>Masukkan Nickname</h3>
+    <input id="nick" placeholder="nickname"/>
+    <button id="joinBtn">Join</button>
   </div>
 </div>
 
-<div class="top">
-  <input id="src" placeholder="Paste link video apa aja">
-  <button onclick="play()">Putar</button>
-</div>
+<div id="app">
+  <input id="videoUrl" placeholder="Paste link video"/>
+  <button id="setVideo">Putar</button>
 
-<div id="player"></div>
+  <iframe id="player" allow="autoplay" allowfullscreen></iframe>
 
-<div class="side">
-  <div class="users" id="users"></div>
-  <div class="chat" id="chat"></div>
-  <div class="chat-input">
-    <input id="msg" placeholder="Chat">
-    <button onclick="sendChat()">➤</button>
-    <button onmousedown="rec()" onmouseup="stop()">🎤</button>
-  </div>
+  <div id="users"></div>
 </div>
 
 <script>
 const socket = io();
-let myName="", recorder, chunks=[];
+const joinBox = document.getElementById("joinBox");
+const app = document.getElementById("app");
 
-/* JOIN SEKALI */
-function start(){
-  myName = name.value;
-  socket.emit("join", myName);
-  login.style.display="none";
+const nickInput = document.getElementById("nick");
+const joinBtn = document.getElementById("joinBtn");
+
+const player = document.getElementById("player");
+const videoUrlInput = document.getElementById("videoUrl");
+const setVideoBtn = document.getElementById("setVideo");
+const usersDiv = document.getElementById("users");
+
+joinBtn.onclick = () => {
+  const nickname = nickInput.value.trim();
+  if (!nickname) return alert("isi nickname");
+
+  socket.emit("join", { nickname });
+
+  joinBox.style.display = "none";
+  app.style.display = "block";
+};
+
+setVideoBtn.onclick = () => {
+  const url = videoUrlInput.value.trim();
+  if (!url) return;
+  socket.emit("set-video", url);
+  setPlayer(url);
+};
+
+function setPlayer(url){
+  player.src = url;
 }
 
-/* VIDEO */
-function normalize(u){
-  if(u.includes("youtube")){
-    let id=u.includes("youtu.be")
-      ?u.split("youtu.be/")[1].split("?")[0]
-      :u.split("v=")[1].split("&")[0];
-    return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`;
+socket.on("set-video", setPlayer);
+
+socket.on("sync-state", (state)=>{
+  if(state.videoUrl){
+    setPlayer(state.videoUrl);
   }
-  return u;
-}
-function play(){
-  socket.emit("video-action",{src:normalize(src.value),playing:true});
-}
-socket.on("init-state",s=>s.src&&sync(s));
-socket.on("sync",sync);
-
-function sync(s){
-  player.innerHTML=`<iframe src="${s.src}" allow="autoplay;fullscreen"
-    style="width:100%;height:100%;border:none"></iframe>`;
-  socket.emit("user-status",s.playing?"watching":"idle");
-}
-
-/* USERS */
-document.addEventListener("visibilitychange",()=>{
-  socket.emit("user-status",document.hidden?"away":"watching");
-});
-socket.on("users",u=>{
-  users.innerHTML=Object.values(u).map(x=>
-    `<div class="user ${x.status}">● ${x.name}</div>`
-  ).join("");
 });
 
-/* CHAT */
-function sendChat(){
-  if(!msg.value)return;
-  chat.innerHTML+=`<div><b>kamu:</b> ${msg.value}</div>`;
-  socket.emit("chat",{user:myName,msg:msg.value});
-  msg.value="";
-}
-socket.on("chat",d=>{
-  chat.innerHTML+=`<div><b>${d.user}:</b> ${d.msg}</div>`;
-});
-
-/* VOICE NOTE (FIXED) */
-async function rec(){
-  chunks=[];
-  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-  recorder=new MediaRecorder(stream);
-  recorder.ondataavailable=e=>chunks.push(e.data);
-  recorder.onstop=()=>{
-    const blob=new Blob(chunks,{type:"audio/webm"});
-    const reader=new FileReader();
-    reader.onload=()=>socket.emit("voice",reader.result);
-    reader.readAsDataURL(blob);
-  };
-  recorder.start();
-}
-function stop(){recorder&&recorder.stop();}
-socket.on("voice",b64=>{
-  const audio=new Audio(b64);
-  audio.play();
+socket.on("user-status", (u)=>{
+  const div = document.createElement("div");
+  div.className = "user";
+  div.textContent = `${u.nickname} ${u.status}`;
+  usersDiv.appendChild(div);
 });
 </script>
+
 </body>
 </html>
