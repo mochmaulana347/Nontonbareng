@@ -3,218 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party - Happy Hues Edition</title>
+    <title>Watch Party - Perfect Hybrid</title>
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
-        /* Palet Warna Happy Hues */
-        :root {
-            --bg: #0f0e17;
-            --headline: #fffffe;
-            --paragraph: #a7a9be;
-            --button: #ff8906;
-            --accent: #f25f4c;
-            --tertiary: #e53170; /* Warna Pink Utama */
-            --card-bg: #16161a;
-        }
-
-        body { 
-            background: var(--bg); 
-            color: var(--paragraph); 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            margin: 0; 
-            display: flex; 
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .main-layout { 
-            display: flex; 
-            gap: 24px; 
-            max-width: 1400px; 
-            width: 95%; 
-            height: 85vh;
-        }
+        :root { --bg: #0f0e17; --headline: #fffffe; --paragraph: #a7a9be; --button: #ff8906; --tertiary: #e53170; --card: #16161a; }
         
-        /* Bagian Video (Besar & Proper) */
-        .video-section { 
-            flex: 2.5; 
-            background: var(--card-bg); 
-            padding: 24px; 
-            border-radius: 24px; 
-            display: flex;
-            flex-direction: column;
-            border: 1px solid #242629;
-        }
+        body { background: var(--bg); color: var(--paragraph); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; height: 100vh; overflow: hidden; }
+        .app-container { display: flex; height: 100vh; width: 100vw; }
 
-        .video-header { display: flex; gap: 12px; margin-bottom: 20px; }
-
-        input { 
-            background: #0f0e17; 
-            border: 2px solid #242629; 
-            padding: 14px; 
-            border-radius: 12px; 
-            color: #fff; 
-            outline: none; 
-            flex: 1;
-            font-size: 14px;
-        }
+        /* Area Video (Besar & Proper) */
+        .video-section { flex: 3; display: flex; flex-direction: column; padding: 20px; background: #000; }
+        .input-group { display: flex; gap: 12px; margin-bottom: 20px; z-index: 10; }
+        input { background: var(--card); border: 2px solid #242629; padding: 12px; border-radius: 12px; color: #fff; flex: 1; outline: none; transition: 0.3s; }
         input:focus { border-color: var(--tertiary); }
+        button { background: var(--tertiary); color: #fff; border: none; padding: 0 25px; border-radius: 12px; cursor: pointer; font-weight: 800; transition: 0.2s; }
+        button:hover { filter: brightness(1.2); transform: translateY(-1px); }
 
-        button { 
-            background: var(--tertiary); 
-            color: white; 
-            border: none; 
-            padding: 0 24px; 
-            border-radius: 12px; 
-            cursor: pointer; 
-            font-weight: 800; 
-            transition: 0.3s;
-        }
-        button:hover { filter: brightness(1.2); transform: translateY(-2px); }
+        /* Container Video YouTube Agar Full Screen di kiri */
+        .video-wrapper { flex: 1; background: #000; border-radius: 20px; overflow: hidden; position: relative; width: 100%; height: 100%; }
+        #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-        /* Pembungkus Video Agar Besar */
-        .video-container {
-            position: relative;
-            width: 100%;
-            padding-bottom: 56.25%; /* Rasio 16:9 */
-            height: 0;
-            background: #000;
-            border-radius: 16px;
-            overflow: hidden;
-            flex-grow: 1;
-        }
-        .video-container iframe, #player {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100% !important;
-            height: 100% !important;
-            border: none;
-        }
-
-        /* Bagian Chat */
-        .chat-section { 
-            flex: 1; 
-            background: var(--card-bg); 
-            padding: 24px; 
-            border-radius: 24px; 
-            display: flex; 
-            flex-direction: column; 
-            border: 1px solid #242629;
-            min-width: 320px;
-        }
-
-        #chat-box { 
-            flex: 1; 
-            overflow-y: auto; 
-            margin-bottom: 16px; 
-            padding-right: 8px; 
-        }
-
-        .msg { 
-            margin-bottom: 12px; 
-            font-size: 14px; 
-            background: #242629; 
-            padding: 12px; 
-            border-radius: 12px; 
-            width: fit-content; 
-            max-width: 85%;
-            line-height: 1.4;
-        }
-        .msg b { color: var(--tertiary); display: block; margin-bottom: 2px; font-size: 12px; }
-
-        h2, h3 { color: var(--headline); margin-top: 0; margin-bottom: 15px; }
+        /* Sidebar & Chat */
+        .sidebar { flex: 1; background: var(--card); border-left: 1px solid #242629; display: flex; flex-direction: column; padding: 25px; min-width: 350px; }
+        #chat-box { flex: 1; overflow-y: auto; background: #0f0e17; border-radius: 15px; padding: 20px; margin-bottom: 20px; border: 1px solid #242629; font-size: 14px; }
+        .user-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+        .badge { background: #242629; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: bold; border: 1px solid #333; color: var(--tertiary); }
+        
+        #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: var(--card); padding: 40px; border-radius: 25px; text-align: center; border: 1px solid #242629; width: 320px; }
     </style>
 </head>
 <body>
-    <div class="main-layout">
-        <div class="video-section">
-            <h2>🎥 Streaming Room</h2>
-            <div class="video-header">
-                <input type="text" id="urlInput" placeholder="Tempel ID Video YouTube (Contoh: dQw4w9WgXcQ)">
-                <button onclick="changeVideo()">PUTAR</button>
-            </div>
-            <div class="video-container">
-                <div id="player"></div>
-            </div>
-        </div>
 
-        <div class="chat-section">
-            <h3>💬 Chat Bareng</h3>
-            <div id="chat-box"></div>
-            <div style="display: flex; gap: 8px;">
-                <input type="text" id="chatInput" placeholder="Ketik pesan..." style="width: 100%;">
-                <button onclick="sendChat()" style="padding: 12px;">KIRIM</button>
-            </div>
+<div id="login-overlay">
+    <div class="login-card">
+        <h2 style="color:white; margin-top:0;">Watch Party</h2>
+        <input type="text" id="joinName" placeholder="Ketik namamu..." style="width:100%; margin-bottom:20px; box-sizing:border-box; text-align:center;">
+        <button onclick="enterRoom()" style="width:100%; height:50px;">GABUNG SEKARANG</button>
+    </div>
+</div>
+
+<div class="app-container">
+    <div class="video-section">
+        <div class="input-group">
+            <input type="text" id="urlInput" placeholder="Tempel ID Video YouTube (Contoh: dQw4w9WgXcQ)">
+            <button onclick="changeVideo()">PUTAR</button>
+        </div>
+        <div class="video-wrapper">
+            <div id="player"></div>
         </div>
     </div>
 
-    <script>
-        const socket = io();
-        let player, isSyncing = false;
+    <div class="sidebar">
+        <div style="font-size:11px; font-weight:800; margin-bottom:10px; letter-spacing:1px; color:var(--paragraph)">PENONTON AKTIF</div>
+        <div id="user-list" class="user-list"></div>
+        
+        <div style="font-size:11px; font-weight:800; margin-bottom:10px; letter-spacing:1px; color:var(--paragraph)">OBROLAN</div>
+        <div id="chat-box"></div>
+        
+        <div class="input-group">
+            <input type="text" id="chatInput" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button onclick="sendChat()">KIRIM</button>
+        </div>
+    </div>
+</div>
 
-        // Load YouTube API
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(tag);
+<script>
+    const socket = io();
+    let player, isSyncing = false;
 
-        function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player', {
-                videoId: 'dQw4w9WgXcQ', // Video Default
-                playerVars: { 'autoplay': 0, 'rel': 0, 'showinfo': 0 },
-                events: { 'onStateChange': onPlayerStateChange }
-            });
+    function enterRoom() {
+        const name = document.getElementById('joinName').value;
+        if(name) {
+            document.getElementById('login-overlay').style.display = 'none';
+            socket.emit('join-room', name);
         }
+    }
 
-        // Kontrol Video (Logika Original Kamu)
-        function onPlayerStateChange(event) {
-            if (isSyncing) return;
-            const time = player.getCurrentTime();
-            if (event.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action: 'play', time });
-            if (event.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action: 'pause', time });
-        }
+    // Load YouTube API
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
 
-        function changeVideo() {
-            const vid = document.getElementById('urlInput').value;
-            if(!vid) return;
-            socket.emit('video-control', { action: 'change', vid });
-            player.loadVideoById(vid);
-        }
-
-        // Fitur Chat
-        function sendChat() {
-            const msg = document.getElementById('chatInput').value;
-            if(!msg) return;
-            socket.emit('new-message', msg);
-            addMessage("Kamu", msg);
-            document.getElementById('chatInput').value = "";
-        }
-
-        function addMessage(user, text) {
-            const box = document.getElementById('chat-box');
-            const color = user === "Kamu" ? "var(--paragraph)" : "white";
-            box.innerHTML += `<div class="msg" style="color: ${color}"><b>${user}</b>${text}</div>`;
-            box.scrollTop = box.scrollHeight;
-        }
-
-        // Menerima Sinyal dari Server (Logika Original Kamu)
-        socket.on('video-control', (data) => {
-            isSyncing = true;
-            if (data.action === 'play') { player.seekTo(data.time); player.playVideo(); }
-            if (data.action === 'pause') player.pauseVideo();
-            if (data.action === 'change') player.loadVideoById(data.vid);
-            setTimeout(() => isSyncing = false, 600);
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+            videoId: 'dQw4w9WgXcQ', // Video Awal
+            events: { 'onStateChange': onPlayerStateChange }
         });
+    }
 
-        socket.on('chat-receive', (msg) => {
-            addMessage("Dia", msg);
-        });
+    // LOGIKA SINKRONISASI (Pakai cara kamu yang stabil)
+    function onPlayerStateChange(event) {
+        if (isSyncing) return;
+        const time = player.getCurrentTime();
+        if (event.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action: 'play', time });
+        if (event.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action: 'pause', time });
+    }
 
-        document.getElementById('chatInput').addEventListener("keyup", (e) => {
-            if (e.key === "Enter") sendChat();
-        });
-    </script>
+    function changeVideo() {
+        const vid = document.getElementById('urlInput').value;
+        if(!vid) return;
+        socket.emit('video-control', { action: 'change', vid });
+        player.loadVideoById(vid);
+    }
+
+    socket.on('video-control', (data) => {
+        isSyncing = true;
+        if (data.action === 'play') { player.seekTo(data.time); player.playVideo(); }
+        if (data.action === 'pause') player.pauseVideo();
+        if (data.action === 'change') player.loadVideoById(data.vid);
+        setTimeout(() => isSyncing = false, 800);
+    });
+
+    // FITUR CHAT & UI
+    socket.on('update-users', (list) => {
+        document.getElementById('user-list').innerHTML = list.map(u => `<span class="badge">${u}</span>`).join('');
+    });
+
+    socket.on('chat-receive', (data) => {
+        addMsg(data.user, data.msg);
+    });
+
+    function sendChat() {
+        const i = document.getElementById('chatInput');
+        const myName = document.getElementById('joinName').value;
+        if(!i.value) return;
+        socket.emit('new-message', { user: myName, msg: i.value });
+        addMsg("Kamu", i.value);
+        i.value = "";
+    }
+
+    function addMsg(user, text) {
+        const b = document.getElementById('chat-box');
+        const color = user === "Kamu" ? "var(--paragraph)" : "var(--tertiary)";
+        b.innerHTML += `<div style="margin-bottom:12px"><b><span style="color:${color}">${user}</span></b>: ${text}</div>`;
+        b.scrollTop = b.scrollHeight;
+    }
+</script>
 </body>
 </html>
