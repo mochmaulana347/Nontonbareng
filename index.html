@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Streamer - Happy Hues</title>
+    <title>Watch Party Final - Ultra Sync</title>
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
@@ -11,47 +11,41 @@
         body { background: var(--bg); color: var(--paragraph); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; height: 100vh; overflow: hidden; }
         .app-container { display: flex; height: 100vh; width: 100vw; }
 
-        /* Video Section */
+        /* Video Area */
         .video-section { flex: 3; display: flex; flex-direction: column; padding: 20px; background: #000; }
-        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .input-group { display: flex; gap: 10px; flex: 1; max-width: 600px; }
-        
-        input { background: var(--card); border: 2px solid #242629; padding: 12px; border-radius: 12px; color: #fff; flex: 1; outline: none; }
-        button { background: var(--tertiary); color: #fff; border: none; padding: 0 25px; border-radius: 12px; cursor: pointer; font-weight: 800; transition: 0.2s; }
-        
-        #role-indicator { font-size: 12px; padding: 5px 15px; border-radius: 20px; font-weight: bold; text-transform: uppercase; }
-        .host-role { background: #22c55e; color: #000; }
-        .viewer-role { background: #3b82f6; color: #fff; }
+        .nav-bar { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; }
+        input { background: var(--card); border: 2px solid #242629; padding: 12px 18px; border-radius: 12px; color: #fff; flex: 1; outline: none; border: 1px solid #333; }
+        button { background: var(--tertiary); color: #fff; border: none; padding: 0 25px; border-radius: 12px; cursor: pointer; font-weight: 800; height: 45px; transition: 0.2s; }
+        button:hover { filter: brightness(1.2); }
 
         .video-wrapper { flex: 1; background: #000; border-radius: 20px; overflow: hidden; position: relative; }
         #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-        /* Sidebar */
+        /* Sidebar Area */
         .sidebar { flex: 1; background: var(--card); border-left: 1px solid #242629; display: flex; flex-direction: column; padding: 25px; min-width: 350px; }
         #chat-box { flex: 1; overflow-y: auto; background: #0f0e17; border-radius: 15px; padding: 20px; margin-bottom: 20px; border: 1px solid #242629; }
-        
+        .user-badge { background: #242629; padding: 5px 12px; border-radius: 8px; font-size: 11px; border: 1px solid #333; color: var(--tertiary); margin-right: 5px; }
+
+        /* Login Overlay */
         #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-        .login-card { background: var(--card); padding: 40px; border-radius: 25px; text-align: center; width: 320px; border: 1px solid #242629; }
+        .login-card { background: var(--card); padding: 40px; border-radius: 30px; text-align: center; border: 1px solid #242629; width: 320px; }
     </style>
 </head>
 <body>
 
 <div id="login-overlay">
     <div class="login-card">
-        <h2 style="color:white; margin-top:0">Watch Party Stream</h2>
-        <input type="text" id="joinName" placeholder="Masukan namamu..." style="width:100%; margin-bottom:20px; text-align:center;">
-        <button onclick="enterRoom()" style="width:100%; height:50px;">MULAI NONTON</button>
+        <h2 style="color:white; margin-top:0;">Watch Party</h2>
+        <input type="text" id="joinName" placeholder="Siapa namamu?" style="width:100%; margin-bottom:20px; text-align:center;">
+        <button onclick="startApp()" style="width:100%">MASUK ROOM</button>
     </div>
 </div>
 
 <div class="app-container">
     <div class="video-section">
-        <div class="header-bar">
-            <div class="input-group">
-                <input type="text" id="urlInput" placeholder="Masukan ID Video YouTube...">
-                <button onclick="changeVideoHost()">SIARKAN</button>
-            </div>
-            <div id="role-indicator" class="viewer-role">Mode Menonton</div>
+        <div class="nav-bar">
+            <input type="text" id="urlInput" placeholder="Tempel ID YouTube (contoh: dQw4w9WgXcQ)">
+            <button onclick="hostChangeVideo()">SIARKAN</button>
         </div>
         <div class="video-wrapper">
             <div id="player"></div>
@@ -59,20 +53,20 @@
     </div>
 
     <div class="sidebar">
-        <h4 style="color:white; margin:0 0 10px 0;">Chat Room</h4>
+        <div id="user-list" style="margin-bottom:20px"></div>
         <div id="chat-box"></div>
         <div style="display:flex; gap:10px;">
-            <input type="text" id="chatInput" placeholder="Ketik..." onkeypress="if(event.key==='Enter') sendChat()">
-            <button onclick="sendChat()">Kirim</button>
+            <input type="text" id="chatInput" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button onclick="sendChat()">KIRIM</button>
         </div>
     </div>
 </div>
 
 <script>
     const socket = io();
-    let player, isHost = false, isSyncing = false;
+    let player, isSyncing = false, syncLockTimeout;
 
-    function enterRoom() {
+    function startApp() {
         const n = document.getElementById('joinName').value;
         if(n) { document.getElementById('login-overlay').style.display='none'; socket.emit('join-room', n); }
     }
@@ -85,77 +79,95 @@
     function onYouTubeIframeAPIReady() {
         player = new YT.Player('player', {
             videoId: 'dQw4w9WgXcQ',
+            playerVars: { 'rel': 0, 'modestbranding': 1 },
             events: { 'onStateChange': onPlayerStateChange }
         });
     }
 
-    // LOGIKA STREAMING
+    // --- LOGIKA SINKRONISASI FINAL (ANTI-BUG) ---
     function onPlayerStateChange(event) {
-        // Hanya kirim perintah jika kita yang memicu aksi (bukan karena dipaksa sistem)
         if (isSyncing) return;
 
-        const state = {
-            vid: document.getElementById('urlInput').value || 'dQw4w9WgXcQ',
-            time: player.getCurrentTime(),
-            isPlaying: (event.data == YT.PlayerState.PLAYING)
-        };
+        const currentTime = player.getCurrentTime();
         
-        // Setiap kali kita melakukan aksi, kita otomatis jadi "Host"
-        setRole(true);
-        socket.emit('host-command', state);
+        // Hanya kirim sinyal jika status benar-benar berubah (Play atau Pause nyata)
+        if (event.data == YT.PlayerState.PLAYING) {
+            socket.emit('video-command', { playing: true, time: currentTime });
+        } 
+        else if (event.data == YT.PlayerState.PAUSED) {
+            // Delay sedikit untuk memastikan ini bukan pause karena buffering
+            setTimeout(() => {
+                if (player.getPlayerState() === YT.PlayerState.PAUSED && !isSyncing) {
+                    socket.emit('video-command', { playing: false, time: currentTime });
+                }
+            }, 150);
+        }
     }
 
-    socket.on('sync-to-viewer', (data) => {
-        if (isHost) return; // Abaikan jika kita adalah host
-        
-        isSyncing = true;
-        setRole(false);
+    socket.on('video-sync', (data) => {
+        sync(data);
+    });
 
-        if (data.isPlaying) {
-            const diff = Math.abs(player.getCurrentTime() - data.time);
-            if (diff > 3) player.seekTo(data.time, true);
-            player.playVideo();
-        } else {
-            player.pauseVideo();
+    socket.on('init-state', (data) => {
+        // Tunggu player siap baru sync pertama kali
+        const checkReady = setInterval(() => {
+            if(player && player.loadVideoById) {
+                sync(data);
+                clearInterval(checkReady);
+            }
+        }, 500);
+    });
+
+    function sync(data) {
+        isSyncing = true;
+        clearTimeout(syncLockTimeout);
+
+        // 1. Cek apakah video sama
+        const currentVid = player.getVideoData().video_id;
+        if (data.vid && data.vid !== currentVid) {
+            player.loadVideoById(data.vid, data.time);
+        }
+
+        // 2. Cek selisih waktu (Drift Correction)
+        const timeDiff = Math.abs(player.getCurrentTime() - data.time);
+        if (timeDiff > 2) {
             player.seekTo(data.time, true);
         }
 
-        setTimeout(() => { isSyncing = false; }, 1200);
-    });
+        // 3. Set status putar
+        if (data.playing) player.playVideo();
+        else player.pauseVideo();
 
-    function changeVideoHost() {
+        // Kunci selama 2 detik untuk stabilisasi buffering
+        syncLockTimeout = setTimeout(() => { isSyncing = false; }, 2000);
+    }
+
+    function hostChangeVideo() {
         const vid = document.getElementById('urlInput').value;
         if(!vid) return;
-        setRole(true);
         player.loadVideoById(vid);
-        socket.emit('host-command', { vid: vid, time: 0, isPlaying: true });
+        socket.emit('video-command', { vid: vid, time: 0, playing: true });
     }
 
-    function setRole(hostStatus) {
-        isHost = hostStatus;
-        const el = document.getElementById('role-indicator');
-        if(isHost) {
-            el.innerText = "🔴 Kamu adalah Host";
-            el.className = "host-role";
-        } else {
-            el.innerText = "🔵 Mode Menonton";
-            el.className = "viewer-role";
-        }
-    }
+    // --- CHAT & USER LIST ---
+    socket.on('update-users', (list) => {
+        document.getElementById('user-list').innerHTML = list.map(u => `<span class="user-badge">${u}</span>`).join('');
+    });
 
-    // Chat
-    socket.on('chat-receive', (d) => { addMsg(d.user, d.msg); });
+    socket.on('chat-receive', (data) => {
+        const b = document.getElementById('chat-box');
+        b.innerHTML += `<div style="margin-bottom:10px"><b>${data.user}:</b> ${data.msg}</div>`;
+        b.scrollTop = b.scrollHeight;
+    });
+
     function sendChat() {
         const i = document.getElementById('chatInput');
         const n = document.getElementById('joinName').value;
         if(!i.value) return;
         socket.emit('new-message', { user: n, msg: i.value });
-        addMsg("Kamu", i.value);
-        i.value = "";
-    }
-    function addMsg(u, m) {
         const b = document.getElementById('chat-box');
-        b.innerHTML += `<div style="margin-bottom:8px"><b>${u}:</b> ${m}</div>`;
+        b.innerHTML += `<div style="margin-bottom:10px; color:var(--paragraph)"><b>Kamu:</b> ${i.value}</div>`;
+        i.value = "";
         b.scrollTop = b.scrollHeight;
     }
 </script>
