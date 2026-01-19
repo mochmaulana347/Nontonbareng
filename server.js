@@ -7,23 +7,52 @@ app.use(express.static(__dirname));
 
 let roomState = {
   vid: "dQw4w9WgXcQ",
-  startedAt: null // timestamp server saat video dimulai
+  startedAt: null
 };
 
+let users = {};
+
 io.on("connection", (socket) => {
-  // kirim state saat user baru join
   socket.emit("video-sync", roomState);
+
+  socket.on("join", (name) => {
+    users[socket.id] = {
+      name,
+      watching: true
+    };
+    io.emit("users", users);
+  });
+
+  socket.on("visibility", (watching) => {
+    if (users[socket.id]) {
+      users[socket.id].watching = watching;
+      io.emit("users", users);
+    }
+  });
+
+  socket.on("chat", (msg) => {
+    if (!users[socket.id]) return;
+    io.emit("chat", {
+      user: users[socket.id].name,
+      msg
+    });
+  });
 
   socket.on("start-video", (data) => {
     roomState = {
       vid: data.vid,
-      startedAt: Date.now() - data.time * 1000
+      startedAt: Date.now()
     };
     io.emit("video-sync", roomState);
+  });
+
+  socket.on("disconnect", () => {
+    delete users[socket.id];
+    io.emit("users", users);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => {
-  console.log("Watch Party running on port", PORT);
-});
+http.listen(PORT, () =>
+  console.log("Watch Party running on", PORT)
+);
