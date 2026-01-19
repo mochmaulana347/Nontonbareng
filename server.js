@@ -5,33 +5,27 @@ const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
-// Data siaran yang disimpan di server
-let broadcastState = {
+// Menyimpan status video agar sinkron untuk semua
+let roomState = {
     vid: 'dQw4w9WgXcQ',
     time: 0,
-    isPlaying: false,
-    hostId: null
+    playing: false,
+    lastUpdate: Date.now()
 };
 
 io.on('connection', (socket) => {
-    // Kirim status saat ini ke user yang baru join
-    socket.emit('init-state', broadcastState);
+    // Saat ada yang baru masuk, langsung kasih status video saat ini
+    socket.emit('init-state', roomState);
 
     socket.on('join-room', (name) => {
         socket.userName = name;
-        // Jika belum ada host, jadikan orang pertama sebagai host
-        if (!broadcastState.hostId) broadcastState.hostId = socket.id;
-        io.emit('update-users', { users: Object.values(io.sockets.connected || {}).map(s => s.userName).filter(n => n), hostId: broadcastState.hostId });
+        updateUserList();
     });
 
-    // Hanya terima perintah jika dikirim oleh Host
-    socket.on('host-command', (data) => {
-        broadcastState.vid = data.vid || broadcastState.vid;
-        broadcastState.time = data.time;
-        broadcastState.isPlaying = data.isPlaying;
-        broadcastState.hostId = socket.id; // Update host ke yang terakhir kasi perintah
-
-        socket.broadcast.emit('sync-to-viewer', broadcastState);
+    socket.on('video-command', (data) => {
+        roomState = { ...roomState, ...data, lastUpdate: Date.now() };
+        // Kirim ke semua orang KECUALI pengirim untuk mencegah feedback loop
+        socket.broadcast.emit('video-sync', roomState);
     });
 
     socket.on('new-message', (data) => {
@@ -39,8 +33,17 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        if (socket.id === broadcastState.hostId) broadcastState.hostId = null;
+        updateUserList();
     });
+
+    function updateUserList() {
+        const users = [];
+        for (let [id, s] of io.sockets.sockets) {
+            if (s.userName) users.push(s.userName);
+        }
+        io.emit('update-users', users);
+    }
 });
 
-http.listen(process.env.PORT || 3000, () => console.log("Streaming Server Ready!"));
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => console.log(`Server Final Ready on port ${PORT}`));
