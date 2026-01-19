@@ -6,36 +6,37 @@ const io = require('socket.io')(http);
 app.use(express.static(__dirname));
 
 let users = {};
-let lastVideoState = { url: '', time: 0, playing: false };
+let lastState = {
+    url: '',
+    time: 0,
+    playing: false,
+    updatedAt: Date.now()
+};
 
 io.on('connection', (socket) => {
-    // Saat orang baru masuk
     socket.on('join-room', (name) => {
-        users[socket.id] = { name: name };
-        io.emit('update-users', Object.values(users));
-        // Kirim status terakhir biar langsung sinkron
-        socket.emit('video-control', { ...lastVideoState, action: 'sync' });
+        users[socket.id] = name;
+        // Kirim status terakhir ke user yang baru join
+        const elapsed = lastState.playing ? (Date.now() - lastState.updatedAt) / 1000 : 0;
+        socket.emit('init-sync', {
+            url: lastState.url,
+            time: lastState.time + elapsed,
+            playing: lastState.playing
+        });
     });
 
-    socket.on('video-control', (data) => {
-        // Simpan status terakhir di server
-        if (data.url) lastVideoState.url = data.url;
-        if (data.time !== undefined) lastVideoState.time = data.time;
-        lastVideoState.playing = (data.action === 'play');
-
-        // Kirim ke semua orang KECUALI pengirimnya
+    socket.on('video-update', (data) => {
+        lastState = {
+            url: data.url,
+            time: data.time,
+            playing: data.action === 'play',
+            updatedAt: Date.now()
+        };
+        // Sebarkan ke yang lain
         socket.broadcast.emit('video-control', data);
     });
 
-    socket.on('new-message', (msg) => {
-        socket.broadcast.emit('chat-receive', { user: users[socket.id]?.name || "Anonim", msg });
-    });
-
-    socket.on('disconnect', () => {
-        delete users[socket.id];
-        io.emit('update-users', Object.values(users));
-    });
+    socket.on('disconnect', () => { delete users[socket.id]; });
 });
 
 http.listen(process.env.PORT || 3000);
-
