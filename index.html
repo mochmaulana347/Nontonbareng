@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Watch Party</title>
+
 <script src="/socket.io/socket.io.js"></script>
-<script src="https://www.youtube.com/iframe_api"></script>
+<link rel="stylesheet"
+ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 
 <style>
 :root{
@@ -13,136 +15,97 @@
 --text:#f8fafc;--muted:#94a3b8;
 --primary:#38bdf8;--accent:#22c55e;--border:#1e293b;
 }
-*{box-sizing:border-box}
-body{
-margin:0;background:var(--bg);color:var(--text);
-font-family:system-ui,-apple-system,sans-serif;height:100vh;
-}
+body{margin:0;background:var(--bg);color:var(--text);font-family:sans-serif;height:100vh}
 .app{display:flex;height:100vh}
-.video{flex:3;display:flex;flex-direction:column;padding:12px}
-.video-box{flex:1;border-radius:16px;overflow:hidden;
-box-shadow:0 0 40px rgba(56,189,248,.25)}
-#player{width:100%;height:100%}
-
-.side{
-flex:1;min-width:280px;
-background:var(--surface);border-left:1px solid var(--border);
-display:flex;flex-direction:column;padding:12px
-}
-.users{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.user{
-padding:4px 10px;border-radius:999px;
-background:var(--soft);font-size:12px;color:var(--muted)
-}
-.user.watch{color:var(--accent)}
-
-.chat{flex:1;overflow:auto;background:var(--bg);
-border-radius:12px;padding:10px;border:1px solid var(--border)}
-.msg{margin-bottom:8px}
-.me{color:var(--primary)}
-
-.input{display:flex;gap:6px;margin-top:8px}
-input,button{
-border-radius:10px;border:1px solid var(--border);
-padding:10px;background:var(--soft);color:white
-}
+.video{flex:3;padding:10px;display:flex;flex-direction:column;gap:8px}
+.side{flex:1;background:var(--surface);padding:10px;display:flex;flex-direction:column;gap:6px}
+input,button{background:var(--soft);border:1px solid var(--border);color:white;border-radius:10px;padding:8px}
 button{background:var(--primary);color:black;font-weight:700}
-
-@media(max-width:768px){
-.app{flex-direction:column}
-.side{min-width:unset;height:40vh}
-}
+iframe,video{width:100%;height:100%;border:0;border-radius:14px}
+.player{flex:1}
+.users span{font-size:12px;margin-right:6px}
+.chat{flex:1;overflow:auto;border:1px solid var(--border);padding:6px;border-radius:10px}
+@media(max-width:768px){.app{flex-direction:column}.side{height:40vh}}
 </style>
 </head>
 
 <body>
 
-<div id="login" style="position:fixed;inset:0;background:var(--bg);
-display:flex;align-items:center;justify-content:center;z-index:9">
-<div style="background:var(--surface);padding:30px;border-radius:20px">
-<h2>Watch Party</h2>
-<input id="name" placeholder="Nama" style="width:100%;margin-bottom:10px">
+<div id="login" style="position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center">
+<div style="background:var(--surface);padding:20px;border-radius:16px">
+<input id="name" placeholder="Nama">
 <button onclick="join()">Masuk</button>
 </div>
 </div>
 
 <div class="app">
 <div class="video">
-<div class="video-box"><div id="player"></div></div>
+<div style="display:flex;gap:6px">
+<input id="src" placeholder="Paste LINK video apa aja">
+<button onclick="setVideo()"><i class="fa fa-play"></i></button>
+</div>
+<div class="player" id="playerBox"></div>
 </div>
 
 <div class="side">
 <div class="users" id="users"></div>
 <div class="chat" id="chat"></div>
-<div class="input">
-<input id="chatInput" placeholder="Chat..." onkeydown="if(event.key=='Enter')send()">
-<button onclick="send()">Kirim</button>
+<div style="display:flex;gap:6px">
+<input id="chatInput" placeholder="Chat" onkeydown="if(event.key=='Enter')send()">
+<button onclick="send()">➤</button>
 </div>
 </div>
 </div>
 
 <script>
 const socket=io();
-let player,isSync=false,myName="";
+let isSync=false,myName="";
+const history=JSON.parse(localStorage.getItem("history")||"[]");
 
 function join(){
 myName=name.value;
 login.style.display="none";
-socket.emit("join-room",myName);
+socket.emit("join",myName);
 }
 
-function onYouTubeIframeAPIReady(){
-player=new YT.Player("player",{
-videoId:"dQw4w9WgXcQ",
-events:{onStateChange:e=>{
-if(isSync)return;
-socket.emit("video-command",{
-time:player.getCurrentTime(),
-playing:e.data===1
-});
-}}
-});
+function setVideo(){
+const s=src.value;
+load(s,0);
+saveHistory(s);
+socket.emit("video",{src:s,time:0,playing:true});
 }
 
-socket.on("init-state",d=>wait(()=>sync(d)));
-socket.on("video-sync",d=>sync(d));
-
-function sync(d){
+function load(s,t){
 isSync=true;
-if(player.getVideoData().video_id!==d.vid)
-player.loadVideoById(d.vid,d.time);
-else if(Math.abs(player.getCurrentTime()-d.time)>2)
-player.seekTo(d.time,true);
-d.playing?player.playVideo():player.pauseVideo();
-setTimeout(()=>isSync=false,1200);
+playerBox.innerHTML = s.endsWith(".mp4")||s.endsWith(".webm")
+? `<video src="${s}" controls autoplay></video>`
+: `<iframe src="${s}" allow="autoplay; fullscreen"></iframe>`;
+setTimeout(()=>isSync=false,1000);
 }
 
-socket.on("user-list",list=>{
-users.innerHTML=list.map(u=>
-`<span class="user ${u.state==="watching"?"watch":""}">● ${u.name}</span>`
-).join("");
+socket.on("init",d=>d.src&&load(d.src,d.time));
+socket.on("sync",d=>!isSync&&load(d.src,d.time));
+
+socket.on("users",list=>{
+users.innerHTML=list.map(u=>`<span>👀 ${u.name}</span>`).join("");
 });
 
 function send(){
 if(!chatInput.value)return;
-chat.innerHTML+=`<div class="msg me"><b>Kamu:</b> ${chatInput.value}</div>`;
-socket.emit("chat-send",chatInput.value);
+chat.innerHTML+=`<div><b>Kamu:</b> ${chatInput.value}</div>`;
+socket.emit("chat",chatInput.value);
 chatInput.value="";
-chat.scrollTop=9999;
 }
 
-socket.on("chat-receive",d=>{
-chat.innerHTML+=`<div class="msg"><b>${d.user}:</b> ${d.msg}</div>`;
-chat.scrollTop=9999;
+socket.on("chat",d=>{
+chat.innerHTML+=`<div><b>${d.user}:</b> ${d.msg}</div>`;
 });
 
-function wait(fn){
-let t=setInterval(()=>player&&player.playVideo&&(fn(),clearInterval(t)),300);
+function saveHistory(s){
+history.unshift(s);
+history.splice(5);
+localStorage.setItem("history",JSON.stringify(history));
 }
-
-document.addEventListener("visibilitychange",()=>{
-socket.emit("user-state",document.hidden?"idle":"watching");
-});
 </script>
 </body>
 </html>
