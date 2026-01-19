@@ -3,26 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party - Ultra Stable</title>
+    <title>Watch Party - Smart Estafet</title>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        body { background: #000; color: #fff; font-family: sans-serif; margin: 0; padding: 20px; }
-        .controls { margin-bottom: 20px; display: flex; gap: 10px; }
-        input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #333; background: #111; color: #fff; }
-        button { padding: 10px 20px; background: #3b82f6; border: none; color: #fff; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        #player-box { width: 100%; max-width: 900px; margin: 0 auto; border-radius: 12px; overflow: hidden; border: 1px solid #222; }
+        body { background: #000; color: #fff; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        .nav { padding: 15px; display: flex; gap: 10px; background: #111; border-bottom: 1px solid #333; }
+        input { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #444; background: #222; color: #fff; outline: none; }
+        button { padding: 10px 20px; background: #3b82f6; border: none; color: #fff; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .video-container { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+        #sync-btn { position: absolute; z-index: 10; padding: 15px 30px; background: #22c55e; border-radius: 50px; font-size: 18px; display: none; }
+        .plyr { width: 100%; max-width: 1000px; }
     </style>
 </head>
 <body>
 
-<div class="controls">
-    <input type="text" id="urlInput" placeholder="Link Video (Direct/YouTube/M3U8)...">
-    <button onclick="changeSource()">Muat Video</button>
+<div class="nav">
+    <input type="text" id="urlInput" placeholder="Tempel link video (YouTube/Direct/M3U8)...">
+    <button onclick="changeVideo()">Putar</button>
 </div>
 
-<div id="player-box">
+<div class="video-container">
+    <button id="sync-btn" onclick="startSync()">Klik untuk Sinkron</button>
     <video id="player" playsinline controls></video>
 </div>
 
@@ -31,83 +34,86 @@
     const socket = io();
     const v = document.getElementById('player');
     const player = new Plyr(v, { ratio: '16:9' });
+    const syncBtn = document.getElementById('sync-btn');
 
-    let lockSync = false; // KUNCI UTAMA: Biar gak ngeloop
-    let lastActionId = null;
+    let isLock = false; // Kunci Anti-Feedback Loop
+    let lastData = null;
 
-    function changeSource(url, fromRemote = false) {
+    // Join room saat pertama kali buka
+    socket.emit('join-room');
+
+    function startSync() {
+        syncBtn.style.display = 'none';
+        if (lastData) applyCommand(lastData);
+    }
+
+    function changeVideo(url, fromRemote = false) {
         const src = url || document.getElementById('urlInput').value;
         if (!src) return;
 
         if (src.includes('.m3u8')) {
             if (Hls.isSupported()) {
-                const hls = new Hls();
-                hls.loadSource(src);
-                hls.attachMedia(v);
+                const hls = new Hls(); hls.loadSource(src); hls.attachMedia(v);
             } else { v.src = src; }
         } else {
             player.source = { type: 'video', sources: [{ src: src }] };
         }
 
         if (!fromRemote) {
-            sendAction('change', src, 0);
+            sendCommand('change', src, 0);
         }
     }
 
-    // Fungsi Pengirim Universal
-    function sendAction(type, url = null, time = null) {
-        if (lockSync) return; // Jangan lapor kalau sedang menerima perintah
-
-        const actionId = Math.random().toString(36).substring(7);
-        lastActionId = actionId;
-
-        socket.emit('video-action', {
-            id: actionId,
-            action: type,
+    // Fungsi Pengirim (Hanya kirim jika tidak sedang terkunci)
+    function sendCommand(action, url = null, time = null) {
+        if (isLock) return;
+        socket.emit('video-command', {
+            action: action,
             url: url || document.getElementById('urlInput').value,
             time: time !== null ? time : player.currentTime
         });
     }
 
-    // Event Listeners
-    player.on('play', () => sendAction('play'));
-    player.on('pause', () => sendAction('pause'));
-    player.on('seeked', () => sendAction('seek'));
+    // Event Listeners (Aksi Fisik)
+    player.on('play', () => sendCommand('play'));
+    player.on('pause', () => sendCommand('pause'));
+    player.on('seeked', () => sendCommand('seek'));
 
-    // MENERIMA PERINTAH (Anti-Loop Logic)
-    socket.on('video-action', (data) => {
-        if (data.id === lastActionId) return; // Abaikan perintah buatan sendiri
+    // Eksekusi perintah dari server
+    function applyCommand(data) {
+        isLock = true; // Kunci pintu keluar!
 
-        lockSync = true; // AKTIFKAN KUNCI
+        if (data.url && data.url !== document.getElementById('urlInput').value) {
+            changeVideo(data.url, true);
+        }
 
-        if (data.action === 'change') changeSource(data.url, true);
-        
-        // Eksekusi Sinkronisasi
         setTimeout(() => {
             const diff = Math.abs(player.currentTime - data.time);
-            
-            // Hanya lompat durasi jika selisih > 3 detik (Mencegah Stuttering)
-            if (data.time !== undefined && diff > 3) {
+            if (data.time !== undefined && diff > 2) {
                 player.currentTime = data.time;
             }
 
-            if (data.action === 'play') player.play();
-            if (data.action === 'pause') player.pause();
+            if (data.action === 'play' || data.playing) {
+                player.play().catch(() => {
+                    syncBtn.style.display = 'block'; // Munculkan tombol jika autoplay diblokir
+                });
+            } else if (data.action === 'pause') {
+                player.pause();
+            }
 
             // Buka kunci setelah 1 detik stabil
-            setTimeout(() => { lockSync = false; }, 1000);
-        }, 500);
+            setTimeout(() => { isLock = false; }, 1000);
+        }, 800);
+    }
+
+    // Menerima perintah dari orang lain atau sinkronisasi awal
+    socket.on('video-command', (data) => {
+        applyCommand(data);
     });
 
-    // Sinkronisasi awal saat baru buka web
-    socket.on('sync-all', (data) => {
-        if (data.url) {
-            changeSource(data.url, true);
-            setTimeout(() => {
-                player.currentTime = data.time;
-                if (data.playing) player.play();
-            }, 2000);
-        }
+    socket.on('sync-join', (data) => {
+        lastData = data;
+        syncBtn.style.display = 'block'; // Paksa user klik sekali agar browser izinkan suara & play
     });
 
 </script>
