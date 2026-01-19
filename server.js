@@ -17,7 +17,6 @@ io.on('connection', (socket) => {
     socket.on('join-room', (name) => {
         users[socket.id] = { name: name, joinedAt: Date.now() };
         
-        // Hitung estimasi waktu sekarang untuk yang baru join
         let estimatedTime = roomState.time;
         if (roomState.playing) {
             estimatedTime += (Date.now() - roomState.updatedAt) / 1000;
@@ -52,4 +51,5 @@ io.on('connection', (socket) => {
     });
 });
 
-http.listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => console.log(`Server jalan di port ${PORT}`));
