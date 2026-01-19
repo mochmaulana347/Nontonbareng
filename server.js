@@ -8,13 +8,11 @@ const io = new Server(server);
 
 app.use(express.static(__dirname));
 
-/* ===== SINGLE SOURCE OF TRUTH ===== */
+/* ===== GLOBAL STATE (SERVER = OTORITAS) ===== */
 const state = {
   videoUrl: "",
-  time: 0,
   playing: false,
-  lastUpdate: Date.now(),
-  users: {} // socketId: { name, status }
+  users: {} // socket.id -> { name, status }
 };
 
 io.on("connection", socket => {
@@ -25,29 +23,19 @@ io.on("connection", socket => {
     io.emit("users", state.users);
   });
 
+  socket.on("intent-set-video", url => {
+    state.videoUrl = url;
+    state.playing = false;
+    io.emit("sync", state);
+  });
+
   socket.on("intent-play", () => {
     state.playing = true;
-    state.lastUpdate = Date.now();
     io.emit("sync", state);
   });
 
   socket.on("intent-pause", () => {
     state.playing = false;
-    state.lastUpdate = Date.now();
-    io.emit("sync", state);
-  });
-
-  socket.on("intent-seek", time => {
-    state.time = time;
-    state.lastUpdate = Date.now();
-    io.emit("sync", state);
-  });
-
-  socket.on("intent-set-video", url => {
-    state.videoUrl = url;
-    state.time = 0;
-    state.playing = false;
-    state.lastUpdate = Date.now();
     io.emit("sync", state);
   });
 
@@ -65,6 +53,4 @@ io.on("connection", socket => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () =>
-  console.log("WatchParty Final running on", PORT)
-);
+server.listen(PORT, () => console.log("WatchParty ready on", PORT));
