@@ -3,52 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party Pro</title>
+    <title>Watch Party Ultra</title>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         body { background-color: #050505; color: #fff; font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; height: 100vh; }
-        
-        /* Overlay Login */
-        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 999; }
-        .login-box { background: #1e293b; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #3b82f6; }
-
+        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; z-index: 999; }
+        .login-box { background: #1e293b; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #3b82f6; box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
         .app-container { display: flex; height: 100vh; }
-        
-        /* Bagian Video (Tengah) */
-        .video-section { flex: 3; display: flex; flex-direction: column; padding: 20px; gap: 15px; }
-        .video-container { border-radius: 15px; overflow: hidden; background: #000; box-shadow: 0 0 30px rgba(59,130,246,0.1); }
-
-        /* Bagian Sidebar (Kanan) */
+        .video-section { flex: 3; display: flex; flex-direction: column; padding: 20px; gap: 15px; background: #000; }
+        .video-container { border-radius: 15px; overflow: hidden; background: #000; flex: 1; display: flex; align-items: center; justify-content: center; }
         .sidebar { flex: 1; background: #0f172a; border-left: 1px solid #1e293b; display: flex; flex-direction: column; padding: 15px; gap: 15px; min-width: 300px; }
-        
         #user-list { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; font-size: 13px; }
-        .user-badge { display: inline-block; background: #3b82f6; padding: 2px 8px; border-radius: 10px; margin: 2px; font-size: 12px; }
-
+        .user-badge { display: inline-block; background: #3b82f6; padding: 2px 8px; border-radius: 10px; margin: 2px; font-size: 11px; }
         #chat-box { flex: 1; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 10px; font-size: 14px; border: 1px solid #1e293b; }
-        .log { font-style: italic; color: #94a3b8; font-size: 12px; margin: 5px 0; text-align: center; }
+        .log { font-style: italic; color: #94a3b8; font-size: 11px; margin: 5px 0; text-align: center; }
         .msg { margin-bottom: 8px; }
         .msg b { color: #60a5fa; }
-
         .input-group { display: flex; gap: 8px; }
         input { flex: 1; background: #111; border: 1px solid #333; padding: 10px; border-radius: 10px; color: #fff; outline: none; }
         button { background: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 10px; cursor: pointer; font-weight: 600; }
+        video { width: 100%; height: 100%; }
     </style>
 </head>
 <body>
 
 <div id="login-overlay">
     <div class="login-box">
-        <h2>Siapa Namamu?</h2>
-        <input type="text" id="nameInput" placeholder="Masukkan nama..." maxlength="15">
-        <button onclick="joinRoom()">Masuk Room</button>
+        <h2 style="margin-top:0">Watch Party</h2>
+        <input type="text" id="nameInput" placeholder="Nama kamu..." maxlength="15">
+        <br><br>
+        <button onclick="joinRoom()">Mulai Nonton</button>
     </div>
 </div>
 
 <div class="app-container">
     <div class="video-section">
         <div class="input-group">
-            <input type="text" id="urlInput" placeholder="Link YouTube atau Link Video Langsung...">
+            <input type="text" id="urlInput" placeholder="Tempel Link (YouTube, MP4, atau Streaming M3U8)...">
             <button onclick="changeSource()">Putar</button>
         </div>
         <div class="video-container">
@@ -72,36 +65,53 @@
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <script>
     const socket = io();
-    const player = new Plyr('#player');
+    const videoElement = document.querySelector('#player');
+    const player = new Plyr(videoElement);
     let myName = "";
     let isSyncing = false;
 
     function joinRoom() {
         const name = document.getElementById('nameInput').value;
-        if (!name) return alert("Nama harus diisi!");
+        if (!name) return alert("Isi nama dulu!");
         myName = name;
         document.getElementById('login-overlay').style.display = 'none';
         socket.emit('join-room', myName);
     }
 
-    // --- Sinkronisasi Video ---
+    function changeSource(url, fromSocket = false) {
+        const targetUrl = url || document.getElementById('urlInput').value;
+        if (!targetUrl) return;
+
+        const isYoutube = targetUrl.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.*$/);
+
+        if (isYoutube) {
+            const ytID = targetUrl.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/)[7];
+            player.source = { type: 'video', sources: [{ src: ytID, provider: 'youtube' }] };
+        } else if (targetUrl.includes('.m3u8')) {
+            // Logika untuk link streaming (HLS)
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(targetUrl);
+                hls.attachMedia(videoElement);
+            } else {
+                videoElement.src = targetUrl;
+            }
+        } else {
+            // Link video biasa (MP4, dll)
+            player.source = { type: 'video', sources: [{ src: targetUrl, type: 'video/mp4' }] };
+        }
+
+        if (!fromSocket) {
+            socket.emit('video-control', { action: 'change', url: targetUrl });
+            document.getElementById('urlInput').value = "";
+        }
+    }
+
+    // Sinkronisasi
     player.on('play', () => { if (!isSyncing) socket.emit('video-control', { action: 'play', time: player.currentTime }); });
     player.on('pause', () => { if (!isSyncing) socket.emit('video-control', { action: 'pause', time: player.currentTime }); });
     player.on('seeked', () => { if (!isSyncing) socket.emit('video-control', { action: 'seek', time: player.currentTime }); });
 
-    function changeSource(url, fromSocket = false) {
-        const targetUrl = url || document.getElementById('urlInput').value;
-        if (!targetUrl) return;
-        const ytID = targetUrl.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/);
-        if (ytID && ytID[7].length == 11) {
-            player.source = { type: 'video', sources: [{ src: ytID[7], provider: 'youtube' }] };
-        } else {
-            player.source = { type: 'video', sources: [{ src: targetUrl, type: 'video/mp4' }] };
-        }
-        if (!fromSocket) socket.emit('video-control', { action: 'change', url: targetUrl });
-    }
-
-    // --- Socket Events ---
     socket.on('video-control', (data) => {
         isSyncing = true;
         if (data.action === 'play') player.play();
@@ -112,8 +122,7 @@
     });
 
     socket.on('update-users', (users) => {
-        const list = document.getElementById('user-list');
-        list.innerHTML = users.map(u => `<span class="user-badge">${u}</span>`).join('');
+        document.getElementById('user-list').innerHTML = users.map(u => `<span class="user-badge">${u}</span>`).join('');
     });
 
     socket.on('sys-log', (text) => {
@@ -122,9 +131,7 @@
         box.scrollTop = box.scrollHeight;
     });
 
-    socket.on('chat-receive', (data) => {
-        addMessage(data.user, data.msg);
-    });
+    socket.on('chat-receive', (data) => { addMessage(data.user, data.msg); });
 
     function sendChat() {
         const msg = document.getElementById('chatInput').value;
@@ -139,6 +146,8 @@
         box.innerHTML += `<div class="msg"><b>${user}:</b> ${text}</div>`;
         box.scrollTop = box.scrollHeight;
     }
+    
+    document.getElementById('chatInput').addEventListener("keyup", (e) => { if (e.key === "Enter") sendChat(); });
 </script>
 </body>
 </html>
