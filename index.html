@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Nobar Online</title>
+  <title>Nobar (Authoritative)</title>
   <style>
     body {
       background:#0f172a;
@@ -15,19 +15,16 @@
       max-width:100%;
       margin:5px 0;
     }
-    video {
-      max-width:100%;
-      margin-top:15px;
-    }
+    video { max-width:100%; margin-top:15px }
   </style>
 </head>
 <body>
 
-<h2>🎬 Nobar Online (Single Room)</h2>
+<h2>🎬 Nobar (1 Host Control)</h2>
+<p id="roleText"></p>
 
-<input id="url" placeholder="Paste YouTube / MP4 online">
-<br>
-<button onclick="loadVideo()">Load Video</button>
+<input id="url" placeholder="Host paste video URL">
+<button id="loadBtn" onclick="loadVideo()">Load Video</button>
 
 <div id="player">
   <video id="video" controls style="display:none"></video>
@@ -41,43 +38,60 @@
 const socket = io();
 const video = document.getElementById("video");
 const ytDiv = document.getElementById("yt");
-let ytPlayer = null;
-let syncing = false;
+const roleText = document.getElementById("roleText");
+const loadBtn = document.getElementById("loadBtn");
 
-/* ===== Utils ===== */
+let role = "viewer";
+let ytPlayer = null;
+let applying = false;
+
+/* ===== ROLE ===== */
+socket.on("role", r => {
+  role = r;
+  roleText.innerText = "Role: " + r.toUpperCase();
+
+  if (role !== "host") {
+    loadBtn.disabled = true;
+    video.controls = false;
+  }
+});
+
+/* ===== UTIL ===== */
 function isYoutube(url) {
   return url.includes("youtube.com") || url.includes("youtu.be");
 }
-
 function getYoutubeId(url) {
   const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
   return m ? m[1] : null;
 }
 
-/* ===== Load ===== */
+/* ===== HOST ACTION ===== */
 function loadVideo() {
-  const url = document.getElementById("url").value;
-  socket.emit("load-video", url);
+  if (role !== "host") return;
+  socket.emit("load-video", url.value);
 }
 
-/* ===== Apply ===== */
-function applyVideo(url, time = 0, play = false) {
-  syncing = true;
+/* ===== APPLY STATE ===== */
+function applyState(s) {
+  if (!s.video) return;
 
-  if (isYoutube(url)) {
+  applying = true;
+
+  if (isYoutube(s.video)) {
     video.style.display = "none";
     ytDiv.innerHTML = '<div id="ytplayer"></div>';
 
     ytPlayer = new YT.Player("ytplayer", {
-      videoId: getYoutubeId(url),
+      videoId: getYoutubeId(s.video),
       events: {
         onReady: () => {
-          ytPlayer.seekTo(time, true);
-          if (play) ytPlayer.playVideo();
-          setTimeout(() => syncing = false, 300);
+          ytPlayer.seekTo(s.time, true);
+          if (s.playing) ytPlayer.playVideo();
+          else ytPlayer.pauseVideo();
+          applying = false;
         },
         onStateChange: e => {
-          if (syncing) return;
+          if (role !== "host" || applying) return;
           if (e.data === 1)
             socket.emit("play", ytPlayer.getCurrentTime());
           if (e.data === 2)
@@ -89,58 +103,29 @@ function applyVideo(url, time = 0, play = false) {
   } else {
     ytDiv.innerHTML = "";
     video.style.display = "block";
-    video.src = url;
-    video.currentTime = time;
-    if (play) video.play();
-    setTimeout(() => syncing = false, 300);
+    video.src = s.video;
+    video.currentTime = s.time;
+    s.playing ? video.play() : video.pause();
+    applying = false;
   }
 }
 
-/* ===== Local Events ===== */
+/* ===== HTML5 HOST ONLY ===== */
 video.onplay = () => {
-  if (!syncing)
+  if (role === "host" && !applying)
     socket.emit("play", video.currentTime);
 };
-
 video.onpause = () => {
-  if (!syncing)
+  if (role === "host" && !applying)
     socket.emit("pause", video.currentTime);
 };
-
 video.onseeked = () => {
-  if (!syncing)
+  if (role === "host" && !applying)
     socket.emit("seek", video.currentTime);
 };
 
-/* ===== Server Events ===== */
-socket.on("state", s => {
-  if (s.video)
-    applyVideo(s.video, s.time, s.playing);
-});
-
-socket.on("load-video", url => {
-  applyVideo(url, 0, false);
-});
-
-socket.on("play", t => {
-  syncing = true;
-  video.currentTime = t;
-  video.play();
-  setTimeout(() => syncing = false, 200);
-});
-
-socket.on("pause", t => {
-  syncing = true;
-  video.currentTime = t;
-  video.pause();
-  setTimeout(() => syncing = false, 200);
-});
-
-socket.on("seek", t => {
-  syncing = true;
-  video.currentTime = t;
-  setTimeout(() => syncing = false, 200);
-});
+/* ===== RECEIVE ===== */
+socket.on("state", applyState);
 </script>
 
 </body>
