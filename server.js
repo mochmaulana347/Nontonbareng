@@ -1,45 +1,46 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const path = require("path");
-
+const express = require('express');
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
 
-/* ===== STATE ===== */
-let state = {
-  video: null,
-  startedAt: null, // timestamp ms
-  pausedAt: null  // timestamp ms
+app.use(express.static(__dirname));
+
+// Data siaran yang disimpan di server
+let broadcastState = {
+    vid: 'dQw4w9WgXcQ',
+    time: 0,
+    isPlaying: false,
+    hostId: null
 };
 
-app.get("/", (_, res) =>
-  res.sendFile(path.join(__dirname, "index.html"))
-);
+io.on('connection', (socket) => {
+    // Kirim status saat ini ke user yang baru join
+    socket.emit('init-state', broadcastState);
 
-io.on("connection", socket => {
-  socket.emit("state", state);
+    socket.on('join-room', (name) => {
+        socket.userName = name;
+        // Jika belum ada host, jadikan orang pertama sebagai host
+        if (!broadcastState.hostId) broadcastState.hostId = socket.id;
+        io.emit('update-users', { users: Object.values(io.sockets.connected || {}).map(s => s.userName).filter(n => n), hostId: broadcastState.hostId });
+    });
 
-  socket.on("load-video", url => {
-    state.video = url;
-    state.startedAt = null;
-    state.pausedAt = null;
-    io.emit("state", state);
-  });
+    // Hanya terima perintah jika dikirim oleh Host
+    socket.on('host-command', (data) => {
+        broadcastState.vid = data.vid || broadcastState.vid;
+        broadcastState.time = data.time;
+        broadcastState.isPlaying = data.isPlaying;
+        broadcastState.hostId = socket.id; // Update host ke yang terakhir kasi perintah
 
-  socket.on("play", () => {
-    if (!state.video) return;
-    state.startedAt = Date.now();
-    state.pausedAt = null;
-    io.emit("state", state);
-  });
+        socket.broadcast.emit('sync-to-viewer', broadcastState);
+    });
 
-  socket.on("pause", () => {
-    if (!state.startedAt) return;
-    state.pausedAt = Date.now();
-    io.emit("state", state);
-  });
+    socket.on('new-message', (data) => {
+        socket.broadcast.emit('chat-receive', data);
+    });
+
+    socket.on('disconnect', () => {
+        if (socket.id === broadcastState.hostId) broadcastState.hostId = null;
+    });
 });
 
-server.listen(process.env.PORT || 3000);
+http.listen(process.env.PORT || 3000, () => console.log("Streaming Server Ready!"));
