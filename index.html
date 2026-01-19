@@ -75,20 +75,38 @@ saveHistory(s);
 socket.emit("video",{src:s,time:0,playing:true});
 }
 
-function load(s,t){
-isSync=true;
-playerBox.innerHTML = s.endsWith(".mp4")||s.endsWith(".webm")
-? `<video src="${s}" controls autoplay></video>`
-: `<iframe src="${s}" allow="autoplay; fullscreen"></iframe>`;
-setTimeout(()=>isSync=false,1000);
+function normalizeSource(url){
+  // YouTube
+  if(url.includes("youtube.com") || url.includes("youtu.be")){
+    let id = "";
+    if(url.includes("youtu.be/"))
+      id = url.split("youtu.be/")[1].split("?")[0];
+    else
+      id = url.split("v=")[1].split("&")[0];
+
+    return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`;
+  }
+
+  // direct video
+  if(url.endsWith(".mp4") || url.endsWith(".webm")){
+    return url;
+  }
+
+  // fallback iframe
+  return url;
 }
 
-socket.on("init",d=>d.src&&load(d.src,d.time));
-socket.on("sync",d=>!isSync&&load(d.src,d.time));
+function load(src,time){
+  isSync=true;
+  const s = normalizeSource(src);
 
-socket.on("users",list=>{
-users.innerHTML=list.map(u=>`<span>👀 ${u.name}</span>`).join("");
-});
+  playerBox.innerHTML =
+    s.endsWith(".mp4") || s.endsWith(".webm")
+    ? `<video src="${s}" controls autoplay></video>`
+    : `<iframe src="${s}" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+
+  setTimeout(()=>isSync=false,1000);
+}
 
 function send(){
 if(!chatInput.value)return;
