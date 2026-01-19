@@ -8,57 +8,60 @@ const io = new Server(server);
 
 app.use(express.static(__dirname));
 
-let roomState = {
-  src: "",
-  playing: false,
-  updatedAt: 0
+let sharedState = {
+  videoUrl: "",
+  currentTime: 0,
+  playing: false
 };
 
-let users = {};
+io.on("connection", (socket) => {
+  console.log("connect:", socket.id);
 
-io.on("connection", socket => {
+  socket.on("join", ({ nickname }) => {
+    if (!nickname) return;
 
-  socket.on("join", name => {
-    users[socket.id] = { name, status: "idle" };
+    socket.nickname = nickname;
 
-    // kirim state TERAKHIR
-    socket.emit("init-state", roomState);
-    io.emit("users", users);
+    // kirim state saat ini ke user baru
+    socket.emit("sync-state", sharedState);
+
+    io.emit("user-status", {
+      id: socket.id,
+      nickname,
+      status: "watching"
+    });
   });
 
-  socket.on("video-action", data => {
-    if (Date.now() - roomState.updatedAt < 300) return;
+  socket.on("set-video", (url) => {
+    sharedState.videoUrl = url;
+    sharedState.currentTime = 0;
+    sharedState.playing = true;
 
-    roomState = {
-      src: data.src ?? roomState.src,
-      playing: data.playing ?? roomState.playing,
-      updatedAt: Date.now()
-    };
-
-    io.emit("sync", roomState);
+    socket.broadcast.emit("set-video", url);
   });
 
-  socket.on("chat", msg => {
-    socket.broadcast.emit("chat", msg);
+  socket.on("play", (time) => {
+    sharedState.playing = true;
+    sharedState.currentTime = time;
+    socket.broadcast.emit("play", time);
   });
 
-  socket.on("voice", data => {
-    socket.broadcast.emit("voice", data);
-  });
-
-  socket.on("user-status", status => {
-    if (users[socket.id]) {
-      users[socket.id].status = status;
-      io.emit("users", users);
-    }
+  socket.on("pause", (time) => {
+    sharedState.playing = false;
+    sharedState.currentTime = time;
+    socket.broadcast.emit("pause", time);
   });
 
   socket.on("disconnect", () => {
-    delete users[socket.id];
-    io.emit("users", users);
+    if (!socket.nickname) return;
+    io.emit("user-status", {
+      id: socket.id,
+      nickname: socket.nickname,
+      status: "left"
+    });
   });
 });
 
-server.listen(process.env.PORT || 3000, () =>
-  console.log("Nobar ready")
-);
+server.listen(process.env.PORT || 3000, () => {
+  console.log("server running");
+});
