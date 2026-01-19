@@ -3,201 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party Cinematic</title>
+    <title>Watch Party Pro</title>
     <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <style>
-        body {
-            background-color: #050505;
-            color: #ffffff;
-            font-family: 'Inter', -apple-system, sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-        }
+        body { background-color: #050505; color: #fff; font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; height: 100vh; }
+        
+        /* Overlay Login */
+        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 999; }
+        .login-box { background: #1e293b; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #3b82f6; }
 
-        .main-container {
-            width: 95%;
-            max-width: 900px;
-            margin-top: 30px;
-            text-align: center;
-        }
+        .app-container { display: flex; height: 100vh; }
+        
+        /* Bagian Video (Tengah) */
+        .video-section { flex: 3; display: flex; flex-direction: column; padding: 20px; gap: 15px; }
+        .video-container { border-radius: 15px; overflow: hidden; background: #000; box-shadow: 0 0 30px rgba(59,130,246,0.1); }
 
-        h1 {
-            font-weight: 800;
-            background: linear-gradient(to right, #3b82f6, #8b5cf6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 20px;
-        }
+        /* Bagian Sidebar (Kanan) */
+        .sidebar { flex: 1; background: #0f172a; border-left: 1px solid #1e293b; display: flex; flex-direction: column; padding: 15px; gap: 15px; min-width: 300px; }
+        
+        #user-list { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; font-size: 13px; }
+        .user-badge { display: inline-block; background: #3b82f6; padding: 2px 8px; border-radius: 10px; margin: 2px; font-size: 12px; }
 
-        /* Player YouTube di Tengah */
-        .video-wrapper {
-            position: relative;
-            padding-bottom: 56.25%;
-            height: 0;
-            overflow: hidden;
-            border-radius: 20px;
-            box-shadow: 0 0 50px rgba(59, 130, 246, 0.2);
-            background: #000;
-            margin-bottom: 25px;
-        }
-
-        .video-wrapper iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-
-        /* Panel Kontrol */
-        .controls-panel {
-            background: rgba(30, 30, 30, 0.6);
-            backdrop-filter: blur(10px);
-            padding: 20px;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .input-group {
-            display: flex;
-            gap: 10px;
-        }
-
-        input {
-            flex: 1;
-            background: #111;
-            border: 1px solid #333;
-            padding: 12px 15px;
-            border-radius: 12px;
-            color: white;
-            outline: none;
-        }
-
-        button {
-            background: #3b82f6;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        button:hover { background: #2563eb; }
-
-        #chat-box {
-            height: 120px;
-            overflow-y: auto;
-            text-align: left;
-            padding: 10px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 12px;
-            font-size: 14px;
-        }
-
+        #chat-box { flex: 1; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 10px; font-size: 14px; border: 1px solid #1e293b; }
+        .log { font-style: italic; color: #94a3b8; font-size: 12px; margin: 5px 0; text-align: center; }
         .msg { margin-bottom: 8px; }
-        .msg span { color: #3b82f6; font-weight: bold; }
+        .msg b { color: #60a5fa; }
+
+        .input-group { display: flex; gap: 8px; }
+        input { flex: 1; background: #111; border: 1px solid #333; padding: 10px; border-radius: 10px; color: #fff; outline: none; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 10px; cursor: pointer; font-weight: 600; }
     </style>
 </head>
 <body>
 
-    <div class="main-container">
-        <h1>Watch Party</h1>
+<div id="login-overlay">
+    <div class="login-box">
+        <h2>Siapa Namamu?</h2>
+        <input type="text" id="nameInput" placeholder="Masukkan nama..." maxlength="15">
+        <button onclick="joinRoom()">Masuk Room</button>
+    </div>
+</div>
 
-        <div class="video-wrapper">
-            <div id="player"></div>
+<div class="app-container">
+    <div class="video-section">
+        <div class="input-group">
+            <input type="text" id="urlInput" placeholder="Link YouTube atau Link Video Langsung...">
+            <button onclick="changeSource()">Putar</button>
         </div>
-
-        <div class="controls-panel">
-            <div class="input-group">
-                <input type="text" id="urlInput" placeholder="Tempel Link YouTube di sini (Bisa Link Browser atau Share)">
-                <button onclick="changeVideo()">Putar Video</button>
-            </div>
-
-            <div id="chat-box"></div>
-
-            <div class="input-group">
-                <input type="text" id="chatInput" placeholder="Ketik pesan...">
-                <button onclick="sendChat()">Kirim</button>
-            </div>
+        <div class="video-container">
+            <video id="player" playsinline controls></video>
         </div>
     </div>
 
-    <script>
-        const socket = io();
-        let player, isSyncing = false;
+    <div class="sidebar">
+        <div>
+            <h4 style="margin:0 0 5px 0">👥 Penonton:</h4>
+            <div id="user-list"></div>
+        </div>
+        <div id="chat-box"></div>
+        <div class="input-group">
+            <input type="text" id="chatInput" placeholder="Ketik pesan...">
+            <button onclick="sendChat()">Kirim</button>
+        </div>
+    </div>
+</div>
 
-        // FUNGSI CANGGIH: Ambil ID dari Link YouTube apapun
-        function extractVideoID(url) {
-            const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-            const match = url.match(regExp);
-            return (match && match[7].length == 11) ? match[7] : url;
+<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+<script>
+    const socket = io();
+    const player = new Plyr('#player');
+    let myName = "";
+    let isSyncing = false;
+
+    function joinRoom() {
+        const name = document.getElementById('nameInput').value;
+        if (!name) return alert("Nama harus diisi!");
+        myName = name;
+        document.getElementById('login-overlay').style.display = 'none';
+        socket.emit('join-room', myName);
+    }
+
+    // --- Sinkronisasi Video ---
+    player.on('play', () => { if (!isSyncing) socket.emit('video-control', { action: 'play', time: player.currentTime }); });
+    player.on('pause', () => { if (!isSyncing) socket.emit('video-control', { action: 'pause', time: player.currentTime }); });
+    player.on('seeked', () => { if (!isSyncing) socket.emit('video-control', { action: 'seek', time: player.currentTime }); });
+
+    function changeSource(url, fromSocket = false) {
+        const targetUrl = url || document.getElementById('urlInput').value;
+        if (!targetUrl) return;
+        const ytID = targetUrl.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/);
+        if (ytID && ytID[7].length == 11) {
+            player.source = { type: 'video', sources: [{ src: ytID[7], provider: 'youtube' }] };
+        } else {
+            player.source = { type: 'video', sources: [{ src: targetUrl, type: 'video/mp4' }] };
         }
+        if (!fromSocket) socket.emit('video-control', { action: 'change', url: targetUrl });
+    }
 
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(tag);
+    // --- Socket Events ---
+    socket.on('video-control', (data) => {
+        isSyncing = true;
+        if (data.action === 'play') player.play();
+        if (data.action === 'pause') player.pause();
+        if (data.action === 'seek') player.currentTime = data.time;
+        if (data.action === 'change') changeSource(data.url, true);
+        setTimeout(() => isSyncing = false, 1000);
+    });
 
-        function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player', {
-                height: '100%', width: '100%', videoId: 'dQw4w9WgXcQ',
-                events: { 'onStateChange': onPlayerStateChange }
-            });
-        }
+    socket.on('update-users', (users) => {
+        const list = document.getElementById('user-list');
+        list.innerHTML = users.map(u => `<span class="user-badge">${u}</span>`).join('');
+    });
 
-        function onPlayerStateChange(event) {
-            if (isSyncing) return;
-            const time = player.getCurrentTime();
-            if (event.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action: 'play', time });
-            if (event.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action: 'pause', time });
-        }
+    socket.on('sys-log', (text) => {
+        const box = document.getElementById('chat-box');
+        box.innerHTML += `<div class="log">${text}</div>`;
+        box.scrollTop = box.scrollHeight;
+    });
 
-        function changeVideo() {
-            const rawUrl = document.getElementById('urlInput').value;
-            if(!rawUrl) return;
-            
-            // Ambil ID dari link yang ditempel
-            const vid = extractVideoID(rawUrl);
-            
-            socket.emit('video-control', { action: 'change', vid });
-            player.loadVideoById(vid);
-            document.getElementById('urlInput').value = ""; // Bersihkan kolom
-        }
+    socket.on('chat-receive', (data) => {
+        addMessage(data.user, data.msg);
+    });
 
-        function sendChat() {
-            const msg = document.getElementById('chatInput').value;
-            if(!msg) return;
-            socket.emit('new-message', msg);
-            addMessage("Kamu", msg);
-            document.getElementById('chatInput').value = "";
-        }
+    function sendChat() {
+        const msg = document.getElementById('chatInput').value;
+        if (!msg) return;
+        socket.emit('new-message', msg);
+        addMessage("Kamu", msg);
+        document.getElementById('chatInput').value = "";
+    }
 
-        function addMessage(user, text) {
-            const box = document.getElementById('chat-box');
-            box.innerHTML += `<div class="msg"><span>${user}:</span> ${text}</div>`;
-            box.scrollTop = box.scrollHeight;
-        }
-
-        socket.on('video-control', (data) => {
-            isSyncing = true;
-            if (data.action === 'play') { player.seekTo(data.time); player.playVideo(); }
-            if (data.action === 'pause') player.pauseVideo();
-            if (data.action === 'change') player.loadVideoById(data.vid);
-            setTimeout(() => isSyncing = false, 600);
-        });
-
-        socket.on('chat-receive', (msg) => { addMessage("Dia", msg); });
-
-        document.getElementById('chatInput').addEventListener("keyup", (e) => {
-            if (e.key === "Enter") sendChat();
-        });
-    </script>
+    function addMessage(user, text) {
+        const box = document.getElementById('chat-box');
+        box.innerHTML += `<div class="msg"><b>${user}:</b> ${text}</div>`;
+        box.scrollTop = box.scrollHeight;
+    }
+</script>
 </body>
 </html>
