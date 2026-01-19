@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Watch Party</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { background: #0f172a; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; }
+        .container { margin-top: 50px; text-align: center; background: #1e293b; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        input { padding: 10px; border-radius: 5px; border: none; width: 300px; }
+        button { padding: 10px 20px; border-radius: 5px; background: #3b82f6; color: white; border: none; cursor: pointer; font-weight: bold; }
+        #player { margin-top: 20px; border-radius: 10px; overflow: hidden; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Watch Party Bareng</h1>
+        <input type="text" id="urlInput" placeholder="Tempel ID Video YouTube...">
+        <button onclick="changeVideo()">Ganti Video</button>
+        <div id="player"></div>
+    </div>
+
+    <script>
+        const socket = io();
+        let player, isSyncing = false;
+
+        // API Youtube
+        var tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.body.appendChild(tag);
+
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                height: '360', width: '640', videoId: 'dQw4w9WgXcQ',
+                events: { 'onStateChange': onPlayerStateChange }
+            });
+        }
+
+        function onPlayerStateChange(event) {
+            if (isSyncing) return;
+            const time = player.getCurrentTime();
+            if (event.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action: 'play', time });
+            if (event.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action: 'pause', time });
+        }
+
+        function changeVideo() {
+            const vid = document.getElementById('urlInput').value;
+            socket.emit('video-control', { action: 'change', vid });
+            player.loadVideoById(vid);
+        }
+
+        socket.on('video-control', (data) => {
+            isSyncing = true;
+            if (data.action === 'play') { player.seekTo(data.time); player.playVideo(); }
+            if (data.action === 'pause') player.pauseVideo();
+            if (data.action === 'change') player.loadVideoById(data.vid);
+            setTimeout(() => isSyncing = false, 600);
+        });
+    </script>
+</body>
+</html>
