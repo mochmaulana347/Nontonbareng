@@ -5,32 +5,47 @@ const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
+// Memory Server untuk menyimpan posisi video terakhir
 let roomState = {
-    url: '',
-    time: 0,
+    url: 'https://cdn.plyr.io/static/demo/View_From_A_Blue_Moon_Trailer-576p.mp4',
+    currentTime: 0,
     playing: false,
-    lastUpdate: Date.now()
+    lastUpdated: Date.now()
 };
 
 io.on('connection', (socket) => {
-    // Kirim data saat ini ke penghuni baru
-    const currentElapsed = roomState.playing ? (Date.now() - roomState.lastUpdate) / 1000 : 0;
-    socket.emit('sync-all', {
-        url: roomState.url,
-        time: roomState.time + currentElapsed,
-        playing: roomState.playing
+    
+    // 1. Logika Orang Baru Join (Initial Sync)
+    socket.on('join-room', () => {
+        // Hitung estimasi waktu sekarang berdasarkan durasi sejak update terakhir
+        let estimatedTime = roomState.currentTime;
+        if (roomState.playing) {
+            const delta = (Date.now() - roomState.lastUpdated) / 1000;
+            estimatedTime += delta;
+        }
+
+        // Kirimkan ke user yang baru join saja
+        socket.emit('video-command', {
+            action: 'sync-join',
+            url: roomState.url,
+            time: estimatedTime,
+            playing: roomState.playing
+        });
     });
 
-    socket.on('video-action', (data) => {
-        // Update state di server
+    // 2. Logika Estafet (Siapa klik, dia jadi patokan)
+    socket.on('video-command', (data) => {
+        // Simpan perubahan ke memory server
         roomState.url = data.url || roomState.url;
-        roomState.time = data.time;
+        roomState.currentTime = data.time;
         roomState.playing = (data.action === 'play');
-        roomState.lastUpdate = Date.now();
+        roomState.lastUpdated = Date.now();
 
-        // Broadcast ke orang lain (KECUALI pengirim)
-        socket.broadcast.emit('video-action', data);
+        // Sebarkan ke semua orang KECUALI pengirim (Broadcast)
+        socket.broadcast.emit('video-command', data);
     });
 });
 
-http.listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => console.log(`Server Estafet aktif di port ${PORT}`));
+
