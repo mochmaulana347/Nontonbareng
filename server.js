@@ -8,11 +8,10 @@ const io = new Server(server);
 
 app.use(express.static(__dirname));
 
-/* ===== GLOBAL STATE (SERVER = OTORITAS) ===== */
 const state = {
   videoUrl: "",
   playing: false,
-  users: {} // socket.id -> { name, status }
+  users: {} // socket.id -> {name, status}
 };
 
 io.on("connection", socket => {
@@ -37,6 +36,10 @@ io.on("connection", socket => {
   socket.on("intent-pause", () => {
     state.playing = false;
     io.emit("sync", state);
+  });
+
+  socket.on("new-message", data => {
+    io.emit("chat-receive", data);
   });
 
   socket.on("status", status => {
