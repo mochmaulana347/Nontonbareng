@@ -3,93 +3,239 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Watch Party Stable</title>
+<title>Watch Party Pro</title>
 <script src="/socket.io/socket.io.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
 <style>
+:root {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --primary: #38bdf8;
+  --accent: #22c55e;
+  --danger: #f87171;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+}
+
+* { box-sizing: border-box; }
+
 body {
   margin: 0;
-  background: #000;
-  color: #fff;
-  font-family: Arial, sans-serif;
-}
-#top {
-  padding: 10px;
+  font-family: Inter, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
   display: flex;
-  gap: 10px;
-  background: #111;
 }
+
+#login {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.login-card {
+  background: var(--card);
+  padding: 30px;
+  border-radius: 16px;
+  width: 280px;
+  text-align: center;
+}
+
 input, button {
+  width: 100%;
   padding: 10px;
+  margin-top: 10px;
+  border-radius: 10px;
+  border: none;
   font-size: 14px;
 }
+
+input {
+  background: #020617;
+  color: var(--text);
+}
+
+button {
+  background: var(--primary);
+  color: #020617;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app {
+  display: flex;
+  width: 100%;
+}
+
+.video {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  padding: 12px;
+  background: var(--card);
+  display: flex;
+  gap: 10px;
+}
+
 #player {
-  width: 100vw;
-  height: calc(100vh - 60px);
+  flex: 1;
+}
+
+.sidebar {
+  flex: 1;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 12px;
+}
+
+.users, .chat {
+  background: #020617;
+  border-radius: 12px;
+  padding: 10px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.user {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.status {
+  font-size: 11px;
+}
+
+.watch { color: var(--accent); }
+.idle { color: var(--danger); }
+
+.chat-msg {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.chat-input {
+  display: flex;
+  gap: 6px;
 }
 </style>
 </head>
 <body>
 
-<div id="top">
-  <input id="vid" placeholder="YouTube Video ID">
-  <button onclick="start()">START NOBAR</button>
-  <button onclick="userPlay()">▶ PLAY</button>
+<div id="login">
+  <div class="login-card">
+    <h3>Watch Party</h3>
+    <input id="name" placeholder="Nickname">
+    <button onclick="join()">Masuk</button>
+  </div>
 </div>
 
-<div id="player"></div>
+<div class="app">
+  <div class="video">
+    <div class="topbar">
+      <input id="vid" placeholder="YouTube Video ID">
+      <button onclick="start()">Start</button>
+      <button onclick="userPlay()">▶ Play</button>
+    </div>
+    <div id="player"></div>
+  </div>
+
+  <div class="sidebar">
+    <div class="users" id="users"></div>
+    <div class="chat" id="chat"></div>
+    <div class="chat-input">
+      <input id="chatText" placeholder="Ketik pesan...">
+      <button onclick="sendChat()">Kirim</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const socket = io();
 let player;
-let userAllowedPlay = false;
 
-// load youtube api
+// YT API
 const tag = document.createElement("script");
 tag.src = "https://www.youtube.com/iframe_api";
 document.body.appendChild(tag);
 
 function onYouTubeIframeAPIReady() {
-  player = new YT.Player("player", {
-    videoId: "dQw4w9WgXcQ",
-    playerVars: { rel: 0 },
-  });
+  player = new YT.Player("player", { videoId: "dQw4w9WgXcQ" });
 }
 
-// user gesture play
+function join() {
+  const n = document.getElementById("name").value;
+  if (!n) return;
+  socket.emit("join", n);
+  document.getElementById("login").style.display = "none";
+}
+
 function userPlay() {
-  userAllowedPlay = true;
   player.playVideo().catch(()=>{});
 }
 
-// host mulai nobar
 function start() {
   const vid = document.getElementById("vid").value;
   if (!vid) return;
-
-  player.loadVideoById(vid, 0);
+  player.loadVideoById(vid);
   socket.emit("start-video", { vid, time: 0 });
 }
 
-// sync logic (TIME ONLY)
-socket.on("video-sync", (state) => {
-  if (!player || !state.startedAt) return;
+// sync time only
+socket.on("video-sync", (s) => {
+  if (!player || !s.startedAt) return;
 
-  const currentVid = player.getVideoData().video_id;
-  if (state.vid !== currentVid) {
-    player.loadVideoById(state.vid, 0);
-    return;
-  }
+  const t = (Date.now() - s.startedAt) / 1000;
+  const diff = t - player.getCurrentTime();
+  if (Math.abs(diff) > 1) player.seekTo(t, true);
+});
 
-  const targetTime = (Date.now() - state.startedAt) / 1000;
-  const diff = targetTime - player.getCurrentTime();
+// presence detect
+document.addEventListener("visibilitychange", () => {
+  socket.emit("presence", {
+    active: !document.hidden,
+    watching: !player?.isMuted()
+  });
+});
 
-  if (Math.abs(diff) > 1) {
-    player.seekTo(targetTime, true);
-  }
+socket.on("users-update", (list) => {
+  const box = document.getElementById("users");
+  box.innerHTML = "";
+  Object.values(list).forEach(u => {
+    box.innerHTML += `
+      <div class="user">
+        <span>${u.name}</span>
+        <span class="status ${u.active ? "watch" : "idle"}">
+          ${u.active ? "🎬 nonton" : "🟡 tab lain"}
+        </span>
+      </div>`;
+  });
+});
 
-  // ❌ JANGAN AUTO PLAY
+function sendChat() {
+  const t = document.getElementById("chatText");
+  if (!t.value) return;
+  socket.emit("chat-send", t.value);
+  t.value = "";
+}
+
+socket.on("chat-receive", (d) => {
+  const c = document.getElementById("chat");
+  c.innerHTML += `<div class="chat-msg"><b>${d.user}:</b> ${d.msg}</div>`;
+  c.scrollTop = c.scrollHeight;
 });
 </script>
-
 </body>
 </html>
