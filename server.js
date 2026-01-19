@@ -1,30 +1,33 @@
-const express = require('express');
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+
 const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const server = http.createServer(app);
+const io = new Server(server);
 
-app.use(express.static(__dirname));
+app.use(express.static("public"));
 
-let users = {};
+io.on("connection", (socket) => {
+  console.log("User connected");
 
-io.on('connection', (socket) => {
-    socket.on('join-room', (name) => {
-        users[socket.id] = name;
-        io.emit('update-users', Object.values(users));
-    });
+  socket.on("play", (time) => {
+    socket.broadcast.emit("play", time);
+  });
 
-    socket.on('video-control', (data) => {
-        socket.broadcast.emit('video-control', data);
-    });
+  socket.on("pause", (time) => {
+    socket.broadcast.emit("pause", time);
+  });
 
-    socket.on('new-message', (data) => {
-        socket.broadcast.emit('chat-receive', data);
-    });
+  socket.on("seek", (time) => {
+    socket.broadcast.emit("seek", time);
+  });
 
-    socket.on('disconnect', () => {
-        delete users[socket.id];
-        io.emit('update-users', Object.values(users));
-    });
+  socket.on("disconnect", () => {
+    console.log("User disconnected");
+  });
 });
 
-http.listen(process.env.PORT || 3000);
+server.listen(3000, () => {
+  console.log("Server running on http://localhost:3000");
+});
