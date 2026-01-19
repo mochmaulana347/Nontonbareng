@@ -4,95 +4,207 @@
 <meta charset="UTF-8">
 <title>Nobar</title>
 <script src="/socket.io/socket.io.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
-body {
-  font-family: sans-serif;
-  background:#f9fafb;
+:root{
+  --bg:#F8FAFC;
+  --card:#FFFFFF;
+  --pri:#3B82F6;
+  --sec:#6366F1;
+  --acc:#22C55E;
+  --text:#0F172A;
+}
+
+body{
   margin:0;
+  font-family:Inter,system-ui;
+  background:var(--bg);
+  color:var(--text);
 }
-#joinBox {
-  position:fixed;
-  inset:0;
+
+#join{
+  position:fixed; inset:0;
+  display:flex; align-items:center; justify-content:center;
+}
+
+#join .card{
+  background:var(--card);
+  padding:24px;
+  border-radius:14px;
+  box-shadow:0 20px 40px rgba(0,0,0,.08);
+}
+
+#app{
+  display:none;
+  padding:12px;
+  max-width:1200px;
+  margin:auto;
+}
+
+.top{
   display:flex;
-  align-items:center;
-  justify-content:center;
-  background:white;
+  gap:8px;
 }
-#app { display:none; padding:12px }
-video, iframe {
+
+.top input{
+  flex:1;
+}
+
+input,button{
+  padding:10px;
+  border-radius:10px;
+  border:1px solid #E5E7EB;
+  font-size:14px;
+}
+
+button{
+  background:var(--pri);
+  color:white;
+  border:none;
+}
+
+iframe{
   width:100%;
-  max-height:60vh;
+  height:55vh;
+  margin-top:10px;
+  border-radius:16px;
   background:black;
 }
-.user { font-size:12px }
+
+.panel{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:10px;
+}
+
+.card{
+  background:var(--card);
+  border-radius:14px;
+  padding:10px;
+}
+
+.user{
+  font-size:13px;
+  display:flex;
+  justify-content:space-between;
+}
+
+.chat{
+  display:flex;
+  flex-direction:column;
+  height:220px;
+}
+
+.chat-log{
+  flex:1;
+  overflow:auto;
+  font-size:13px;
+}
+
+.chat-input{
+  display:flex;
+  gap:6px;
+}
+
+@media(max-width:700px){
+  .panel{grid-template-columns:1fr}
+}
 </style>
 </head>
+
 <body>
 
-<div id="joinBox">
-  <div>
-    <h3>Masukkan Nickname</h3>
-    <input id="nick" placeholder="nickname"/>
-    <button id="joinBtn">Join</button>
+<div id="join">
+  <div class="card">
+    <h3>Join Nobar</h3>
+    <input id="nick" placeholder="nickname">
+    <button id="joinBtn">Masuk</button>
   </div>
 </div>
 
 <div id="app">
-  <input id="videoUrl" placeholder="Paste link video"/>
-  <button id="setVideo">Putar</button>
+  <div class="top">
+    <input id="url" placeholder="Paste link video (embed)">
+    <button id="playBtn">Putar</button>
+  </div>
 
-  <iframe id="player" allow="autoplay" allowfullscreen></iframe>
+  <iframe id="player" allow="autoplay"></iframe>
 
-  <div id="users"></div>
+  <div class="panel">
+    <div class="card">
+      <b>Users</b>
+      <div id="users"></div>
+    </div>
+
+    <div class="card chat">
+      <b>Chat</b>
+      <div class="chat-log" id="chatLog"></div>
+      <div class="chat-input">
+        <input id="chatMsg" placeholder="ketik...">
+        <button id="send">Kirim</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
 const socket = io();
-const joinBox = document.getElementById("joinBox");
+const join = document.getElementById("join");
 const app = document.getElementById("app");
-
-const nickInput = document.getElementById("nick");
-const joinBtn = document.getElementById("joinBtn");
-
 const player = document.getElementById("player");
-const videoUrlInput = document.getElementById("videoUrl");
-const setVideoBtn = document.getElementById("setVideo");
-const usersDiv = document.getElementById("users");
 
-joinBtn.onclick = () => {
-  const nickname = nickInput.value.trim();
-  if (!nickname) return alert("isi nickname");
-
-  socket.emit("join", { nickname });
-
-  joinBox.style.display = "none";
-  app.style.display = "block";
+document.getElementById("joinBtn").onclick = ()=>{
+  const n = nick.value.trim();
+  if(!n) return;
+  socket.emit("join",{nickname:n});
+  join.style.display="none";
+  app.style.display="block";
 };
 
-setVideoBtn.onclick = () => {
-  const url = videoUrlInput.value.trim();
-  if (!url) return;
-  socket.emit("set-video", url);
-  setPlayer(url);
+playBtn.onclick = ()=>{
+  const u = url.value.trim();
+  if(!u) return;
+  socket.emit("set-video",u);
+  player.src=u;
 };
 
-function setPlayer(url){
-  player.src = url;
-}
-
-socket.on("set-video", setPlayer);
-
-socket.on("sync-state", (state)=>{
-  if(state.videoUrl){
-    setPlayer(state.videoUrl);
-  }
+socket.on("sync", ({state,users})=>{
+  if(state.videoUrl) player.src = state.videoUrl;
+  renderUsers(users);
 });
 
-socket.on("user-status", (u)=>{
-  const div = document.createElement("div");
-  div.className = "user";
-  div.textContent = `${u.nickname} ${u.status}`;
-  usersDiv.appendChild(div);
+socket.on("users", renderUsers);
+
+socket.on("set-video", u=>{
+  player.src=u;
+});
+
+function renderUsers(u){
+  users.innerHTML="";
+  Object.values(u).forEach(x=>{
+    users.innerHTML+=`
+      <div class="user">
+        <span>${x.nickname}</span>
+        <span>${x.status}</span>
+      </div>`;
+  });
+}
+
+send.onclick = ()=>{
+  if(!chatMsg.value) return;
+  socket.emit("chat", chatMsg.value);
+  chatMsg.value="";
+};
+
+socket.on("chat", d=>{
+  chatLog.innerHTML+=`<div><b>${d.nickname}:</b> ${d.msg}</div>`;
+  chatLog.scrollTop=9999;
+});
+
+document.addEventListener("visibilitychange",()=>{
+  socket.emit("status", document.hidden ? "idle" : "watching");
 });
 </script>
 
