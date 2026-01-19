@@ -9,7 +9,10 @@ const io = new Server(server);
 app.use(express.static("public"));
 
 io.on("connection", (socket) => {
-  console.log("User connected");
+
+  socket.on("load-video", (url) => {
+    socket.broadcast.emit("load-video", url);
+  });
 
   socket.on("play", (time) => {
     socket.broadcast.emit("play", time);
@@ -23,11 +26,6 @@ io.on("connection", (socket) => {
     socket.broadcast.emit("seek", time);
   });
 
-  socket.on("disconnect", () => {
-    console.log("User disconnected");
-  });
 });
 
-server.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
-});
+server.listen(process.env.PORT || 3000);
