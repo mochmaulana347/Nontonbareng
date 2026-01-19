@@ -102,9 +102,16 @@ aside{
   width:280px;
   text-align:center;
 }
+#chat-box{
+  flex:1;
+  overflow-y:auto;
+  background:#0f172a;
+  padding:10px;
+  border-radius:12px;
+  margin-top:10px;
+}
 </style>
 </head>
-
 <body>
 
 <div class="login" id="login">
@@ -123,11 +130,16 @@ aside{
     <div class="controls">
       <input id="url" placeholder="Paste link video apa aja">
       <button onclick="setVideo()">Putar</button>
-      <button onclick="play()">▶</button>
-      <button onclick="pause()">⏸</button>
+      <button id="playBtn">▶</button>
+      <button id="pauseBtn">⏸</button>
     </div>
     <div id="player-wrap">
       <iframe id="player" allow="autoplay"></iframe>
+    </div>
+    <div id="chat-box"></div>
+    <div style="display:flex; gap:6px; margin-top:6px;">
+      <input id="chatInput" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') sendChat()">
+      <button onclick="sendChat()">KIRIM</button>
     </div>
   </div>
 
@@ -141,26 +153,20 @@ aside{
 const socket = io();
 let player = document.getElementById("player");
 
-/* ===== AUTO EMBED RESOLVER ===== */
+/* ===== AUTO EMBED ===== */
 function resolveEmbed(url){
   url = url.trim();
-
-  if(url.includes("youtube.com") || url.includes("youtu.be")){
-    let id = url.includes("v=")
-      ? url.split("v=")[1].split("&")[0]
-      : url.split("/").pop();
+  if(url.includes("youtube.com")||url.includes("youtu.be")){
+    let id = url.includes("v=")?url.split("v=")[1].split("&")[0]:url.split("/").pop();
     return { type:"iframe", src:`https://www.youtube.com/embed/${id}?autoplay=1&enablejsapi=1` };
   }
-
   if(url.includes("vimeo.com")){
     const id = url.split("/").pop();
     return { type:"iframe", src:`https://player.vimeo.com/video/${id}?autoplay=1` };
   }
-
   if(url.match(/\.(mp4|webm)$/)){
     return { type:"video", src:url };
   }
-
   return { type:"iframe", src:url };
 }
 
@@ -177,25 +183,35 @@ function setVideo(){ socket.emit("intent-set-video", url.value); }
 function play(){ socket.emit("intent-play"); }
 function pause(){ socket.emit("intent-pause"); }
 
-/* ===== APPLY STATE ===== */
+/* ===== SYNC STATE ===== */
 socket.on("sync", state=>{
   if(state.videoUrl){
     const res = resolveEmbed(state.videoUrl);
 
     if(res.type === "video"){
-      player.outerHTML = `
-        <video id="player" controls autoplay>
-          <source src="${res.src}">
-        </video>`;
+      player.outerHTML = `<video id="player" controls autoplay>
+        <source src="${res.src}">
+      </video>`;
       player = document.getElementById("player");
     }else{
-      if(player.tagName !== "IFRAME"){
+      if(player.tagName!=="IFRAME"){
         document.getElementById("player-wrap").innerHTML =
           `<iframe id="player" allow="autoplay"></iframe>`;
         player = document.getElementById("player");
       }
-      if(player.src !== res.src) player.src = res.src;
+      if(player.src!==res.src) player.src=res.src;
     }
+  }
+
+  // play/pause untuk iframe (YT/Vimeo) via postMessage
+  if(player.tagName==="IFRAME"){
+    try{
+      if(state.playing) player.contentWindow?.postMessage('{"event":"command","func":"playVideo"}',"*");
+      else player.contentWindow?.postMessage('{"event":"command","func":"pauseVideo"}',"*");
+    }catch(e){}
+  }else{
+    if(state.playing) player.play();
+    else player.pause();
   }
 });
 
@@ -205,16 +221,31 @@ socket.on("users", users=>{
   box.innerHTML="";
   Object.values(users).forEach(u=>{
     const cls = u.status==="watching"?"green":"gray";
-    box.innerHTML += `
-      <div class="user">
-        <i class="ph-eye ${cls}"></i>${u.name}
-      </div>`;
+    box.innerHTML += `<div class="user"><i class="ph-eye ${cls}"></i>${u.name}</div>`;
   });
 });
 
+/* ===== CHAT ===== */
+socket.on("chat-receive", data=>{
+  const b=document.getElementById("chat-box");
+  b.innerHTML += `<div style="margin-bottom:4px"><b>${data.user}:</b> ${data.msg}</div>`;
+  b.scrollTop = b.scrollHeight;
+});
+
+function sendChat(){
+  const i = document.getElementById("chatInput");
+  const n = nickname.value.trim();
+  if(!i.value) return;
+  socket.emit("new-message",{user:n,msg:i.value});
+  const b=document.getElementById("chat-box");
+  b.innerHTML += `<div style="margin-bottom:4px;color:#94a3b8"><b>Kamu:</b> ${i.value}</div>`;
+  i.value="";
+  b.scrollTop=b.scrollHeight;
+}
+
 /* ===== STATUS ===== */
 document.addEventListener("visibilitychange",()=>{
-  socket.emit("status", document.hidden?"away":"watching");
+  socket.emit("status",document.hidden?"away":"watching");
 });
 </script>
 
