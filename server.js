@@ -10,7 +10,6 @@ app.use(express.static(__dirname));
 
 let roomState = {
   src: "",
-  time: 0,
   playing: false,
   updatedAt: 0
 };
@@ -21,6 +20,8 @@ io.on("connection", socket => {
 
   socket.on("join", name => {
     users[socket.id] = { name, status: "idle" };
+
+    // kirim state TERAKHIR
     socket.emit("init-state", roomState);
     io.emit("users", users);
   });
@@ -30,12 +31,11 @@ io.on("connection", socket => {
 
     roomState = {
       src: data.src ?? roomState.src,
-      time: data.time ?? roomState.time,
       playing: data.playing ?? roomState.playing,
       updatedAt: Date.now()
     };
 
-    socket.broadcast.emit("sync", roomState);
+    io.emit("sync", roomState);
   });
 
   socket.on("chat", msg => {
@@ -60,5 +60,5 @@ io.on("connection", socket => {
 });
 
 server.listen(process.env.PORT || 3000, () =>
-  console.log("Nobar server ready")
+  console.log("Nobar ready")
 );
