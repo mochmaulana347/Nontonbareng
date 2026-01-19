@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party Pro X</title>
+    <title>Watch Party Pro (Admin Control)</title>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -12,45 +12,42 @@
         #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; z-index: 999; }
         .login-box { background: #111; padding: 40px; border-radius: 24px; text-align: center; border: 1px solid #3b82f6; width: 300px; }
         .app-container { display: flex; height: 100vh; width: 100vw; }
-        
-        /* Video Section - Dibuat supaya Full */
-        .video-section { flex: 3; display: flex; flex-direction: column; padding: 20px; background: #000; box-sizing: border-box; }
-        .video-wrapper { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 20px; overflow: hidden; }
-        .plyr { width: 100% !important; border-radius: 15px; }
-
-        .sidebar { flex: 1; background: #0a0a0a; border-left: 1px solid #1e293b; display: flex; flex-direction: column; padding: 20px; gap: 20px; min-width: 320px; box-sizing: border-box; }
+        .video-section { flex: 3; display: flex; flex-direction: column; padding: 20px; gap: 15px; }
+        .video-wrapper { flex: 1; display: flex; align-items: center; justify-content: center; border-radius: 20px; overflow: hidden; background: #000; position: relative; }
+        .sidebar { flex: 1; background: #0a0a0a; border-left: 1px solid #1e293b; display: flex; flex-direction: column; padding: 20px; gap: 20px; min-width: 320px; }
         #user-list { display: flex; flex-wrap: wrap; gap: 8px; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 12px; }
         .user-badge { padding: 5px 12px; border-radius: 20px; font-size: 11px; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.1); }
         .dot { width: 8px; height: 8px; border-radius: 50%; }
-        .status-watching { background: rgba(34, 197, 94, 0.2); color: #4ade80; border-color: #22c55e; }
-        .status-watching .dot { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
-        .status-away { background: rgba(148, 163, 184, 0.2); color: #94a3b8; border-color: #475569; }
+        .status-watching { background: rgba(34, 197, 94, 0.1); color: #4ade80; border-color: #22c55e; }
+        .status-watching .dot { background: #22c55e; }
+        .status-away { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border-color: #475569; }
         .status-away .dot { background: #94a3b8; }
-
+        .admin-star { color: #f59e0b; font-size: 14px; }
         #chat-box { flex: 1; overflow-y: auto; background: rgba(255,255,255,0.02); border-radius: 12px; padding: 15px; font-size: 14px; border: 1px solid #1e293b; }
-        .log { font-style: italic; color: #64748b; font-size: 11px; margin: 8px 0; text-align: center; }
-        .input-group { display: flex; gap: 10px; }
-        input { flex: 1; background: #161616; border: 1px solid #262626; padding: 12px; border-radius: 12px; color: #fff; outline: none; }
+        input { background: #161616; border: 1px solid #262626; padding: 12px; border-radius: 12px; color: #fff; outline: none; }
         button { background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 12px; cursor: pointer; font-weight: 700; }
+        /* Kunci Player buat Penonton */
+        .locked-player { pointer-events: none; }
     </style>
 </head>
 <body>
 
 <div id="login-overlay">
     <div class="login-box">
-        <h2 style="margin:0 0 20px 0; color:#3b82f6;">Masuk Room</h2>
+        <h2 style="color:#3b82f6;">Watch Party</h2>
         <input type="text" id="nameInput" placeholder="Namamu..." style="width:80%; margin-bottom:20px;">
-        <button onclick="joinRoom()" style="width: 100%;">Mulai</button>
+        <button onclick="joinRoom()" style="width: 100%;">Masuk</button>
     </div>
 </div>
 
 <div class="app-container">
     <div class="video-section">
-        <div class="input-group">
-            <input type="text" id="urlInput" placeholder="Link Video (YouTube/Streaming)...">
-            <button onclick="changeSource()">Putar</button>
+        <div class="input-group" id="admin-controls" style="display: none;">
+            <input type="text" id="urlInput" placeholder="Link Video..." style="flex:1;">
+            <button onclick="changeSource()">Putar & Ganti</button>
         </div>
-        <div class="video-wrapper">
+        <div id="status-bar" style="font-size: 12px; color: #64748b;">Menunggu Admin...</div>
+        <div class="video-wrapper" id="player-container">
             <video id="player" playsinline controls></video>
         </div>
     </div>
@@ -58,8 +55,9 @@
     <div class="sidebar">
         <div><h4 style="margin:0 0 10px 0; color:#94a3b8;">👥 Penonton</h4><div id="user-list"></div></div>
         <div id="chat-box"></div>
-        <div class="input-group">
-            <input type="text" id="chatInput" placeholder="Chat..."><button onclick="sendChat()">Kirim</button>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="chatInput" placeholder="Chat..." style="flex:1;">
+            <button onclick="sendChat()">Kirim</button>
         </div>
     </div>
 </div>
@@ -68,7 +66,8 @@
 <script>
     const socket = io();
     const videoElement = document.querySelector('#player');
-    const player = new Plyr(videoElement, { ratio: '16:9' });
+    let player = new Plyr(videoElement);
+    let isAdmin = false;
     let isSyncing = false;
 
     function joinRoom() {
@@ -97,27 +96,16 @@
             player.source = { type: 'video', sources: [{ src: targetUrl, type: 'video/mp4' }] };
         }
 
-        if (!fromSocket) {
+        if (!fromSocket && isAdmin) {
             socket.emit('video-control', { action: 'change', url: targetUrl });
             document.getElementById('urlInput').value = "";
         }
     }
 
-    // Sync Logic - Pakai isSyncing biar ga Feedback Loop
-    player.on('play', () => { 
-        if (!isSyncing) socket.emit('video-control', { action: 'play', time: player.currentTime }); 
-    });
-    player.on('pause', () => { 
-        if (!isSyncing) socket.emit('video-control', { action: 'pause', time: player.currentTime }); 
-    });
-    player.on('seeked', () => { 
-        if (!isSyncing) socket.emit('video-control', { action: 'seek', time: player.currentTime }); 
-    });
-
-    // Lapor detik ke server (untuk Initial Sync)
-    setInterval(() => {
-        if (player.playing && !isSyncing) socket.emit('time-update', player.currentTime);
-    }, 2000);
+    // Hanya kirim kontrol jika User adalah Admin
+    player.on('play', () => { if (isAdmin && !isSyncing) socket.emit('video-control', { action: 'play', time: player.currentTime }); });
+    player.on('pause', () => { if (isAdmin && !isSyncing) socket.emit('video-control', { action: 'pause', time: player.currentTime }); });
+    player.on('seeked', () => { if (isAdmin && !isSyncing) socket.emit('video-control', { action: 'seek', time: player.currentTime }); });
 
     socket.on('video-control', (data) => {
         isSyncing = true;
@@ -125,7 +113,6 @@
         
         setTimeout(() => {
             if (data.time !== undefined) {
-                // Hanya seek kalau bedanya lebih dari 2 detik (biar ga lag)
                 if (Math.abs(player.currentTime - data.time) > 2) player.currentTime = data.time;
             }
             if (data.action === 'play') player.play();
@@ -134,17 +121,26 @@
         }, 1000);
     });
 
-    socket.on('update-users', (users) => {
+    socket.on('update-users', (data) => {
+        const { users, adminId } = data;
+        isAdmin = (socket.id === adminId);
+        
+        // Atur Tampilan berdasarkan status Admin
+        document.getElementById('admin-controls').style.display = isAdmin ? 'flex' : 'none';
+        document.getElementById('status-bar').innerText = isAdmin ? "🌟 Kamu adalah Admin (Kontrol Aktif)" : "📺 Kamu adalah Penonton (Mengikuti Admin)";
+        document.getElementById('player-container').className = isAdmin ? "video-wrapper" : "video-wrapper locked-player";
+
         document.getElementById('user-list').innerHTML = users.map(u => `
             <div class="user-badge ${u.status === 'Watching' ? 'status-watching' : 'status-away'}">
-                <div class="dot"></div>${u.name}
+                <div class="dot"></div>
+                ${u.isAdmin ? '👑 ' : ''}${u.name}
             </div>
         `).join('');
     });
 
     socket.on('sys-log', (text) => {
         const box = document.getElementById('chat-box');
-        box.innerHTML += `<div class="log">${text}</div>`;
+        box.innerHTML += `<div style="font-style:italic; color:#64748b; font-size:11px; margin:5px 0; text-align:center;">${text}</div>`;
         box.scrollTop = box.scrollHeight;
     });
 
