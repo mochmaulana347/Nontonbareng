@@ -2,248 +2,93 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Watch Together</title>
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
+<title>Nobar Universal</title>
+<script src="/socket.io/socket.io.js"></script>
 <style>
-:root{
-  --bg:#f7f9fc;
-  --card:#ffffff;
-  --primary:#3f8efc;
-  --accent:#f4b400;
-  --text:#1f2937;
-  --muted:#6b7280;
-}
-
-*{box-sizing:border-box;font-family:system-ui}
-body{margin:0;background:var(--bg);color:var(--text)}
-
-header{
-  padding:12px 16px;
-  background:var(--card);
-  display:flex;
-  gap:8px;
-  align-items:center;
-  box-shadow:0 2px 8px rgba(0,0,0,.05);
-}
-
-header input{
-  flex:1;
-  padding:10px;
-  border:1px solid #ddd;
-  border-radius:8px;
-}
-
-header button{
-  padding:10px 14px;
-  border:none;
-  background:var(--primary);
-  color:#fff;
-  border-radius:8px;
-  cursor:pointer;
-}
-
-main{
-  display:grid;
-  grid-template-columns:1fr 300px;
-  gap:12px;
-  padding:12px;
-}
-
-@media(max-width:768px){
-  main{grid-template-columns:1fr}
-}
-
-.player{
-  background:var(--card);
-  border-radius:12px;
-  overflow:hidden;
-  aspect-ratio:16/9;
-}
-
-.player iframe,
-.player video{
-  width:100%;
-  height:100%;
-  border:none;
-}
-
-.side{
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-}
-
-.card{
-  background:var(--card);
-  border-radius:12px;
-  padding:12px;
-}
-
-.status span{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-size:14px;
-}
-
-.status i{color:var(--primary)}
-
-.chat{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  height:200px;
-}
-
-.chat-log{
-  flex:1;
-  overflow:auto;
-  border:1px solid #eee;
-  border-radius:8px;
-  padding:8px;
-  font-size:14px;
-}
-
-.chat input{
-  padding:8px;
-  border-radius:8px;
-  border:1px solid #ddd;
-}
-
-.history{
-  font-size:14px;
-}
-
-.history div{
-  padding:6px;
-  cursor:pointer;
-  border-radius:6px;
-}
-.history div:hover{background:#eef2ff}
-
-.footer{
-  text-align:center;
-  font-size:12px;
-  color:var(--muted);
-  padding:8px;
-}
+body{margin:0;background:#0f0e17;color:#fff;font-family:sans-serif}
+.top{padding:10px;display:flex;gap:10px}
+input{flex:1;padding:10px;border-radius:8px;border:none}
+button{padding:10px 20px;border:none;border-radius:8px;background:#ff8906;color:#000}
+#player{width:100%;height:60vh;background:#000}
+.user{font-size:13px}
+.watching{color:#2cb67d}
+.idle{color:#ff8906}
+.away{color:#e53170}
 </style>
 </head>
-
 <body>
 
-<header>
-  <input id="link" placeholder="Paste link video (YouTube / mp4 / webm)">
-  <button onclick="loadVideo()"><i class="fa fa-play"></i></button>
-</header>
-
-<main>
-  <div class="player" id="playerBox"></div>
-
-  <div class="side">
-
-    <div class="card status">
-      <strong>Status</strong>
-      <span id="watchStatus"><i class="fa fa-eye"></i> idle</span>
-      <span id="tabStatus"><i class="fa fa-window-restore"></i> tab aktif</span>
-    </div>
-
-    <div class="card">
-      <strong>Chat</strong>
-      <div class="chat">
-        <div class="chat-log" id="chatLog"></div>
-        <input id="chatInput" placeholder="ketik pesan..." onkeydown="sendChat(event)">
-      </div>
-    </div>
-
-    <div class="card">
-      <strong>History</strong>
-      <div class="history" id="history"></div>
-    </div>
-
-  </div>
-</main>
-
-<div class="footer">
-  Watch Together • personal use
+<div class="top">
+  <input id="name" placeholder="Nama">
+  <button onclick="join()">Join</button>
 </div>
 
-<script>
-const box = document.getElementById("playerBox");
-const historyBox = document.getElementById("history");
-const chatLog = document.getElementById("chatLog");
+<div class="top">
+  <input id="src" placeholder="Paste link video apa aja">
+  <button onclick="loadSrc()">Putar</button>
+</div>
 
-let nickname = localStorage.nick || prompt("Nickname?") || "anon";
-localStorage.nick = nickname;
+<div id="player"></div>
+
+<h3>User</h3>
+<div id="users"></div>
+
+<script>
+const socket = io();
+let syncing = false;
+let lastAction = 0;
+
+function join(){
+  socket.emit("join", document.getElementById("name").value);
+}
 
 function normalize(url){
+  // YouTube
   if(url.includes("youtube.com") || url.includes("youtu.be")){
-    let id="";
-    if(url.includes("youtu.be/")) id=url.split("youtu.be/")[1].split("?")[0];
-    else id=url.split("v=")[1].split("&")[0];
+    let id = url.includes("youtu.be/")
+      ? url.split("youtu.be/")[1].split("?")[0]
+      : url.split("v=")[1].split("&")[0];
     return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`;
   }
   return url;
 }
 
-function loadVideo(src){
-  const url = src || document.getElementById("link").value;
-  if(!url) return;
-
-  const final = normalize(url);
-
-  box.innerHTML = final.match(/\.(mp4|webm)$/)
-    ? `<video src="${final}" controls autoplay></video>`
-    : `<iframe src="${final}" allow="autoplay; fullscreen"></iframe>`;
-
-  saveHistory(url);
-  document.getElementById("watchStatus").innerHTML =
-    `<i class="fa fa-circle-play"></i> sedang menonton`;
+function loadSrc(){
+  const src = normalize(document.getElementById("src").value);
+  socket.emit("video-action",{src,playing:true,time:0});
 }
 
-function saveHistory(url){
-  let h = JSON.parse(localStorage.history||"[]");
-  if(!h.includes(url)){
-    h.unshift(url);
-    h=h.slice(0,5);
-    localStorage.history=JSON.stringify(h);
-  }
-  renderHistory();
-}
+socket.on("init-state", s => {
+  if(s.src) applySync(s);
+});
 
-function renderHistory(){
-  historyBox.innerHTML="";
-  (JSON.parse(localStorage.history||"[]")).forEach(u=>{
-    const d=document.createElement("div");
-    d.textContent=u;
-    d.onclick=()=>loadVideo(u);
-    historyBox.appendChild(d);
-  });
-}
+socket.on("sync", s => applySync(s));
 
-function sendChat(e){
-  if(e.key!=="Enter")return;
-  const t=e.target.value.trim();
-  if(!t)return;
-  const m=document.createElement("div");
-  m.textContent=`${nickname}: ${t}`;
-  chatLog.appendChild(m);
-  chatLog.scrollTop=9999;
-  e.target.value="";
+function applySync(s){
+  syncing = true;
+  const box = document.getElementById("player");
+
+  box.innerHTML = `
+    <iframe src="${s.src}" 
+      allow="autoplay; fullscreen" 
+      style="width:100%;height:100%;border:none">
+    </iframe>
+  `;
+
+  socket.emit("user-status", s.playing ? "watching" : "idle");
+  setTimeout(()=>syncing=false,800);
 }
 
 document.addEventListener("visibilitychange",()=>{
-  document.getElementById("tabStatus").innerHTML =
-    document.hidden
-    ? `<i class="fa fa-eye-slash"></i> tab lain`
-    : `<i class="fa fa-window-restore"></i> tab aktif`;
+  socket.emit("user-status", document.hidden ? "away":"watching");
 });
 
-renderHistory();
+socket.on("users", u=>{
+  document.getElementById("users").innerHTML =
+    Object.values(u).map(x=>{
+      return `<div class="user ${x.status}">● ${x.name} (${x.status})</div>`;
+    }).join("");
+});
 </script>
-
 </body>
 </html>
