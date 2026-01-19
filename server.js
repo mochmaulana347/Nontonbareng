@@ -5,38 +5,32 @@ const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
-let users = {};
-let lastState = {
+let roomState = {
     url: '',
     time: 0,
     playing: false,
-    updatedAt: Date.now()
+    lastUpdate: Date.now()
 };
 
 io.on('connection', (socket) => {
-    socket.on('join-room', (name) => {
-        users[socket.id] = name;
-        // Kirim status terakhir ke user yang baru join
-        const elapsed = lastState.playing ? (Date.now() - lastState.updatedAt) / 1000 : 0;
-        socket.emit('init-sync', {
-            url: lastState.url,
-            time: lastState.time + elapsed,
-            playing: lastState.playing
-        });
+    // Kirim data saat ini ke penghuni baru
+    const currentElapsed = roomState.playing ? (Date.now() - roomState.lastUpdate) / 1000 : 0;
+    socket.emit('sync-all', {
+        url: roomState.url,
+        time: roomState.time + currentElapsed,
+        playing: roomState.playing
     });
 
-    socket.on('video-update', (data) => {
-        lastState = {
-            url: data.url,
-            time: data.time,
-            playing: data.action === 'play',
-            updatedAt: Date.now()
-        };
-        // Sebarkan ke yang lain
-        socket.broadcast.emit('video-control', data);
-    });
+    socket.on('video-action', (data) => {
+        // Update state di server
+        roomState.url = data.url || roomState.url;
+        roomState.time = data.time;
+        roomState.playing = (data.action === 'play');
+        roomState.lastUpdate = Date.now();
 
-    socket.on('disconnect', () => { delete users[socket.id]; });
+        // Broadcast ke orang lain (KECUALI pengirim)
+        socket.broadcast.emit('video-action', data);
+    });
 });
 
 http.listen(process.env.PORT || 3000);
