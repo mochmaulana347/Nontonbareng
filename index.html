@@ -1,124 +1,147 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Nobar</title>
-<script src="/socket.io/socket.io.js"></script>
+<title>Nobar — Final</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="/socket.io/socket.io.js"></script>
 
 <style>
 :root{
   --bg:#F8FAFC;
   --card:#FFFFFF;
-  --pri:#3B82F6;
-  --sec:#6366F1;
+  --primary:#2563EB;
+  --secondary:#6366F1;
   --watch:#22C55E;
   --idle:#FACC15;
   --away:#EF4444;
   --text:#0F172A;
+  --muted:#64748B;
 }
+
+*{box-sizing:border-box}
 
 body{
   margin:0;
-  font-family:Inter,system-ui;
+  font-family:Inter,system-ui,sans-serif;
   background:var(--bg);
   color:var(--text);
 }
 
+/* JOIN */
 #join{
   position:fixed; inset:0;
   display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,#EEF2FF,#F8FAFC);
 }
-
 #join .card{
   background:var(--card);
-  padding:26px;
-  border-radius:16px;
-  box-shadow:0 20px 40px rgba(0,0,0,.08);
-  width:280px;
+  padding:28px;
+  border-radius:20px;
+  width:300px;
+  box-shadow:0 20px 50px rgba(0,0,0,.12);
 }
 
+/* APP */
 #app{
   display:none;
-  padding:14px;
   max-width:1200px;
   margin:auto;
+  padding:14px;
 }
 
+/* TOP */
 .top{
   display:flex;
   gap:8px;
+  margin-bottom:10px;
 }
-
 input,button{
-  padding:11px;
-  border-radius:10px;
+  padding:12px;
+  border-radius:14px;
   border:1px solid #E5E7EB;
   font-size:14px;
 }
-
 button{
-  background:var(--pri);
+  background:var(--primary);
   color:white;
   border:none;
   cursor:pointer;
 }
 
+/* PLAYER */
+.player-wrap{
+  position:relative;
+}
 iframe{
   width:100%;
   height:55vh;
-  margin-top:12px;
-  border-radius:18px;
-  background:black;
+  border-radius:20px;
   border:none;
+  background:black;
+}
+.now{
+  position:absolute;
+  bottom:12px;
+  left:12px;
+  background:rgba(0,0,0,.6);
+  color:white;
+  padding:6px 12px;
+  border-radius:999px;
+  font-size:12px;
 }
 
+/* PANELS */
 .panel{
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:12px;
   margin-top:12px;
 }
-
 .card{
   background:var(--card);
-  border-radius:16px;
-  padding:12px;
+  border-radius:18px;
+  padding:14px;
 }
 
+/* USERS */
 .user{
   display:flex;
   align-items:center;
   justify-content:space-between;
   font-size:13px;
-  margin-top:6px;
+  margin-top:8px;
 }
-
+.user-left{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
 .dot{
   width:10px;
   height:10px;
   border-radius:50%;
-  margin-right:8px;
 }
 
+/* CHAT */
 .chat{
   display:flex;
   flex-direction:column;
-  height:240px;
+  height:260px;
 }
-
 .chat-log{
   flex:1;
   overflow:auto;
   font-size:13px;
 }
-
+.msg{margin-bottom:6px}
 .chat-input{
   display:flex;
   gap:6px;
 }
 
-@media(max-width:700px){
+/* MOBILE */
+@media(max-width:720px){
   .panel{grid-template-columns:1fr}
   iframe{height:42vh}
 }
@@ -127,21 +150,26 @@ iframe{
 
 <body>
 
+<!-- JOIN -->
 <div id="join">
   <div class="card">
-    <h3>Join Nobar</h3>
-    <input id="nick" placeholder="nickname">
+    <h3>Nobar</h3>
+    <input id="nick" placeholder="Nickname">
     <button id="joinBtn" style="width:100%;margin-top:10px">Masuk</button>
   </div>
 </div>
 
+<!-- APP -->
 <div id="app">
   <div class="top">
-    <input id="url" placeholder="Paste link video (YouTube / Vimeo / Embed)">
+    <input id="url" placeholder="Paste link video apa aja">
     <button id="playBtn">Putar</button>
   </div>
 
-  <iframe id="player" allow="autoplay; fullscreen"></iframe>
+  <div class="player-wrap">
+    <iframe id="player" allow="autoplay; fullscreen"></iframe>
+    <div class="now">▶ Now Playing</div>
+  </div>
 
   <div class="panel">
     <div class="card">
@@ -153,7 +181,7 @@ iframe{
       <b>Chat</b>
       <div class="chat-log" id="chatLog"></div>
       <div class="chat-input">
-        <input id="chatMsg" placeholder="ketik...">
+        <input id="chatMsg" placeholder="Ketik pesan...">
         <button id="send">Kirim</button>
       </div>
     </div>
@@ -162,20 +190,21 @@ iframe{
 
 <script>
 const socket = io();
-const join = document.getElementById("join");
+const joinBox = document.getElementById("join");
 const app = document.getElementById("app");
 const player = document.getElementById("player");
 
-document.getElementById("joinBtn").onclick = ()=>{
+/* JOIN */
+joinBtn.onclick = ()=>{
   const n = nick.value.trim();
   if(!n) return;
   socket.emit("join",{nickname:n});
-  join.style.display="none";
+  joinBox.style.display="none";
   app.style.display="block";
 };
 
-/* ================= AUTO EMBED ================= */
-function toEmbed(url){
+/* AUTO EMBED (FINAL, AMAN) */
+function embed(url){
   try{
     if(url.includes("youtube.com/watch")){
       const id = new URL(url).searchParams.get("v");
@@ -189,69 +218,59 @@ function toEmbed(url){
       const id = url.split("/").pop();
       return `https://player.vimeo.com/video/${id}?autoplay=1`;
     }
-    return url; // already embed / direct iframe
-  }catch{
     return url;
-  }
+  }catch{ return url }
 }
 
+/* PUTAR */
 playBtn.onclick = ()=>{
-  const raw = url.value.trim();
-  if(!raw) return;
-  const embed = toEmbed(raw);
-  socket.emit("set-video", embed);
-  player.src = embed;
+  if(!url.value) return;
+  const e = embed(url.value);
+  player.src = e;
+  socket.emit("set-video", e);
 };
 
-socket.on("sync", ({state,users})=>{
-  if(state.videoUrl) player.src = state.videoUrl;
-  renderUsers(users);
-});
-
-socket.on("users", renderUsers);
-
+/* SOCKET EVENTS */
 socket.on("set-video", u=>{
   player.src=u;
 });
 
-/* ================= USERS ================= */
-function renderUsers(u){
-  users.innerHTML="";
-  Object.values(u).forEach(x=>{
-    let color = "--watch";
-    if(x.status==="idle") color="--idle";
-    if(x.status==="away") color="--away";
+socket.on("users", renderUsers);
 
+function renderUsers(list){
+  users.innerHTML="";
+  Object.values(list).forEach(u=>{
+    let c="var(--watch)";
+    if(u.status==="idle") c="var(--idle)";
+    if(u.status==="away") c="var(--away)";
     users.innerHTML+=`
       <div class="user">
-        <div style="display:flex;align-items:center">
-          <div class="dot" style="background:var(${color})"></div>
-          ${x.nickname}
+        <div class="user-left">
+          <div class="dot" style="background:${c}"></div>
+          ${u.nickname}
         </div>
-        <small>${x.status}</small>
+        <small>${u.status}</small>
       </div>`;
   });
 }
 
-/* ================= CHAT ================= */
-send.onclick = ()=>{
+/* STATUS */
+document.addEventListener("visibilitychange",()=>{
+  socket.emit("status", document.hidden?"idle":"watching");
+});
+window.addEventListener("blur",()=>socket.emit("status","idle"));
+window.addEventListener("focus",()=>socket.emit("status","watching"));
+
+/* CHAT */
+send.onclick=()=>{
   if(!chatMsg.value) return;
   socket.emit("chat", chatMsg.value);
   chatMsg.value="";
 };
-
 socket.on("chat", d=>{
-  chatLog.innerHTML+=`<div><b>${d.nickname}:</b> ${d.msg}</div>`;
+  chatLog.innerHTML+=`<div class="msg"><b>${d.nickname}:</b> ${d.msg}</div>`;
   chatLog.scrollTop=9999;
 });
-
-/* ================= STATUS ================= */
-document.addEventListener("visibilitychange",()=>{
-  socket.emit("status", document.hidden ? "idle" : "watching");
-});
-
-window.addEventListener("blur",()=>socket.emit("status","idle"));
-window.addEventListener("focus",()=>socket.emit("status","watching"));
 </script>
 
 </body>
