@@ -6,12 +6,17 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+/* ====== GLOBAL STATE ====== */
+let currentVideo = null;
+let currentTime = 0;
+let isPlaying = false;
+
 /* ================= HTML ================= */
 const html = `
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Nobar Online (Single)</title>
+  <title>Nobar Online</title>
   <style>
     body {
       background:#0f172a;
@@ -25,21 +30,14 @@ const html = `
       max-width:100%;
       margin:5px 0;
     }
-    button {
-      cursor:pointer;
-    }
-    video {
-      max-width:100%;
-      margin-top:15px;
-    }
+    video { max-width:100%; margin-top:15px }
   </style>
 </head>
 <body>
 
-<h2>🎬 Nobar Online (Single Room)</h2>
+<h2>🎬 Nobar Online (Stable)</h2>
 
-<input id="url" placeholder="Paste link YouTube / MP4 online">
-<br>
+<input id="url" placeholder="Paste YouTube / MP4 online">
 <button onclick="loadVideo()">Load Video</button>
 
 <div id="player">
@@ -56,24 +54,28 @@ const video = document.getElementById("video");
 const ytDiv = document.getElementById("yt");
 let ytPlayer = null;
 
+/* ===== FLAG ANTI LOOP ===== */
+let syncing = false;
+
 /* ===== Utils ===== */
 function isYoutube(url) {
   return url.includes("youtube.com") || url.includes("youtu.be");
 }
 
 function getYoutubeId(url) {
-  const match = url.match(/(?:v=|\\/)([0-9A-Za-z_-]{11})/);
-  return match ? match[1] : null;
+  const m = url.match(/(?:v=|\\/)([0-9A-Za-z_-]{11})/);
+  return m ? m[1] : null;
 }
 
-/* ===== Load Video ===== */
+/* ===== Load ===== */
 function loadVideo() {
   const url = document.getElementById("url").value;
   socket.emit("load-video", url);
-  applyVideo(url);
 }
 
-function applyVideo(url) {
+/* ===== Apply ===== */
+function applyVideo(url, time = 0, play = false) {
+  syncing = true;
 
   if (isYoutube(url)) {
     video.style.display = "none";
@@ -82,7 +84,12 @@ function applyVideo(url) {
     ytPlayer = new YT.Player("ytplayer", {
       videoId: getYoutubeId(url),
       events: {
+        onReady: () => {
+          ytPlayer.seekTo(time, true);
+          if (play) ytPlayer.playVideo();
+        },
         onStateChange: (e) => {
+          if (syncing) return;
           if (e.data === 1)
             socket.emit("play", ytPlayer.getCurrentTime());
           if (e.data === 2)
@@ -93,65 +100,3 @@ function applyVideo(url) {
 
   } else {
     ytDiv.innerHTML = "";
-    video.style.display = "block";
-    video.src = url;
-    video.load();
-  }
-}
-
-/* ===== HTML5 Sync ===== */
-video.onplay = () =>
-  socket.emit("play", video.currentTime);
-
-video.onpause = () =>
-  socket.emit("pause", video.currentTime);
-
-video.onseeked = () =>
-  socket.emit("seek", video.currentTime);
-
-/* ===== Receive Sync ===== */
-socket.on("load-video", applyVideo);
-
-socket.on("play", t => {
-  video.currentTime = t;
-  video.play();
-});
-
-socket.on("pause", t => {
-  video.currentTime = t;
-  video.pause();
-});
-
-socket.on("seek", t => {
-  video.currentTime = t;
-});
-</script>
-
-</body>
-</html>
-`;
-
-/* ================= SERVER ================= */
-app.get("/", (_, res) => res.send(html));
-
-io.on("connection", (socket) => {
-
-  socket.on("load-video", (url) => {
-    socket.broadcast.emit("load-video", url);
-  });
-
-  socket.on("play", (time) => {
-    socket.broadcast.emit("play", time);
-  });
-
-  socket.on("pause", (time) => {
-    socket.broadcast.emit("pause", time);
-  });
-
-  socket.on("seek", (time) => {
-    socket.broadcast.emit("seek", time);
-  });
-
-});
-
-server.listen(process.env.PORT || 3000);
