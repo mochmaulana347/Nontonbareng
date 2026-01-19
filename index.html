@@ -1,129 +1,249 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Watch Party</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watch Together</title>
 
-<script src="/socket.io/socket.io.js"></script>
-<link rel="stylesheet"
- href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
 <style>
 :root{
---bg:#0f172a;--surface:#111827;--soft:#1f2937;
---text:#f8fafc;--muted:#94a3b8;
---primary:#38bdf8;--accent:#22c55e;--border:#1e293b;
+  --bg:#f7f9fc;
+  --card:#ffffff;
+  --primary:#3f8efc;
+  --accent:#f4b400;
+  --text:#1f2937;
+  --muted:#6b7280;
 }
-body{margin:0;background:var(--bg);color:var(--text);font-family:sans-serif;height:100vh}
-.app{display:flex;height:100vh}
-.video{flex:3;padding:10px;display:flex;flex-direction:column;gap:8px}
-.side{flex:1;background:var(--surface);padding:10px;display:flex;flex-direction:column;gap:6px}
-input,button{background:var(--soft);border:1px solid var(--border);color:white;border-radius:10px;padding:8px}
-button{background:var(--primary);color:black;font-weight:700}
-iframe,video{width:100%;height:100%;border:0;border-radius:14px}
-.player{flex:1}
-.users span{font-size:12px;margin-right:6px}
-.chat{flex:1;overflow:auto;border:1px solid var(--border);padding:6px;border-radius:10px}
-@media(max-width:768px){.app{flex-direction:column}.side{height:40vh}}
+
+*{box-sizing:border-box;font-family:system-ui}
+body{margin:0;background:var(--bg);color:var(--text)}
+
+header{
+  padding:12px 16px;
+  background:var(--card);
+  display:flex;
+  gap:8px;
+  align-items:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.05);
+}
+
+header input{
+  flex:1;
+  padding:10px;
+  border:1px solid #ddd;
+  border-radius:8px;
+}
+
+header button{
+  padding:10px 14px;
+  border:none;
+  background:var(--primary);
+  color:#fff;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+main{
+  display:grid;
+  grid-template-columns:1fr 300px;
+  gap:12px;
+  padding:12px;
+}
+
+@media(max-width:768px){
+  main{grid-template-columns:1fr}
+}
+
+.player{
+  background:var(--card);
+  border-radius:12px;
+  overflow:hidden;
+  aspect-ratio:16/9;
+}
+
+.player iframe,
+.player video{
+  width:100%;
+  height:100%;
+  border:none;
+}
+
+.side{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.card{
+  background:var(--card);
+  border-radius:12px;
+  padding:12px;
+}
+
+.status span{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:14px;
+}
+
+.status i{color:var(--primary)}
+
+.chat{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  height:200px;
+}
+
+.chat-log{
+  flex:1;
+  overflow:auto;
+  border:1px solid #eee;
+  border-radius:8px;
+  padding:8px;
+  font-size:14px;
+}
+
+.chat input{
+  padding:8px;
+  border-radius:8px;
+  border:1px solid #ddd;
+}
+
+.history{
+  font-size:14px;
+}
+
+.history div{
+  padding:6px;
+  cursor:pointer;
+  border-radius:6px;
+}
+.history div:hover{background:#eef2ff}
+
+.footer{
+  text-align:center;
+  font-size:12px;
+  color:var(--muted);
+  padding:8px;
+}
 </style>
 </head>
 
 <body>
 
-<div id="login" style="position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center">
-<div style="background:var(--surface);padding:20px;border-radius:16px">
-<input id="name" placeholder="Nama">
-<button onclick="join()">Masuk</button>
-</div>
-</div>
+<header>
+  <input id="link" placeholder="Paste link video (YouTube / mp4 / webm)">
+  <button onclick="loadVideo()"><i class="fa fa-play"></i></button>
+</header>
 
-<div class="app">
-<div class="video">
-<div style="display:flex;gap:6px">
-<input id="src" placeholder="Paste LINK video apa aja">
-<button onclick="setVideo()"><i class="fa fa-play"></i></button>
-</div>
-<div class="player" id="playerBox"></div>
-</div>
+<main>
+  <div class="player" id="playerBox"></div>
 
-<div class="side">
-<div class="users" id="users"></div>
-<div class="chat" id="chat"></div>
-<div style="display:flex;gap:6px">
-<input id="chatInput" placeholder="Chat" onkeydown="if(event.key=='Enter')send()">
-<button onclick="send()">➤</button>
-</div>
-</div>
+  <div class="side">
+
+    <div class="card status">
+      <strong>Status</strong>
+      <span id="watchStatus"><i class="fa fa-eye"></i> idle</span>
+      <span id="tabStatus"><i class="fa fa-window-restore"></i> tab aktif</span>
+    </div>
+
+    <div class="card">
+      <strong>Chat</strong>
+      <div class="chat">
+        <div class="chat-log" id="chatLog"></div>
+        <input id="chatInput" placeholder="ketik pesan..." onkeydown="sendChat(event)">
+      </div>
+    </div>
+
+    <div class="card">
+      <strong>History</strong>
+      <div class="history" id="history"></div>
+    </div>
+
+  </div>
+</main>
+
+<div class="footer">
+  Watch Together • personal use
 </div>
 
 <script>
-const socket=io();
-let isSync=false,myName="";
-const history=JSON.parse(localStorage.getItem("history")||"[]");
+const box = document.getElementById("playerBox");
+const historyBox = document.getElementById("history");
+const chatLog = document.getElementById("chatLog");
 
-function join(){
-myName=name.value;
-login.style.display="none";
-socket.emit("join",myName);
-}
+let nickname = localStorage.nick || prompt("Nickname?") || "anon";
+localStorage.nick = nickname;
 
-function setVideo(){
-const s=src.value;
-load(s,0);
-saveHistory(s);
-socket.emit("video",{src:s,time:0,playing:true});
-}
-
-function normalizeSource(url){
-  // YouTube
+function normalize(url){
   if(url.includes("youtube.com") || url.includes("youtu.be")){
-    let id = "";
-    if(url.includes("youtu.be/"))
-      id = url.split("youtu.be/")[1].split("?")[0];
-    else
-      id = url.split("v=")[1].split("&")[0];
-
+    let id="";
+    if(url.includes("youtu.be/")) id=url.split("youtu.be/")[1].split("?")[0];
+    else id=url.split("v=")[1].split("&")[0];
     return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`;
   }
-
-  // direct video
-  if(url.endsWith(".mp4") || url.endsWith(".webm")){
-    return url;
-  }
-
-  // fallback iframe
   return url;
 }
 
-function load(src,time){
-  isSync=true;
-  const s = normalizeSource(src);
+function loadVideo(src){
+  const url = src || document.getElementById("link").value;
+  if(!url) return;
 
-  playerBox.innerHTML =
-    s.endsWith(".mp4") || s.endsWith(".webm")
-    ? `<video src="${s}" controls autoplay></video>`
-    : `<iframe src="${s}" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+  const final = normalize(url);
 
-  setTimeout(()=>isSync=false,1000);
+  box.innerHTML = final.match(/\.(mp4|webm)$/)
+    ? `<video src="${final}" controls autoplay></video>`
+    : `<iframe src="${final}" allow="autoplay; fullscreen"></iframe>`;
+
+  saveHistory(url);
+  document.getElementById("watchStatus").innerHTML =
+    `<i class="fa fa-circle-play"></i> sedang menonton`;
 }
 
-function send(){
-if(!chatInput.value)return;
-chat.innerHTML+=`<div><b>Kamu:</b> ${chatInput.value}</div>`;
-socket.emit("chat",chatInput.value);
-chatInput.value="";
+function saveHistory(url){
+  let h = JSON.parse(localStorage.history||"[]");
+  if(!h.includes(url)){
+    h.unshift(url);
+    h=h.slice(0,5);
+    localStorage.history=JSON.stringify(h);
+  }
+  renderHistory();
 }
 
-socket.on("chat",d=>{
-chat.innerHTML+=`<div><b>${d.user}:</b> ${d.msg}</div>`;
+function renderHistory(){
+  historyBox.innerHTML="";
+  (JSON.parse(localStorage.history||"[]")).forEach(u=>{
+    const d=document.createElement("div");
+    d.textContent=u;
+    d.onclick=()=>loadVideo(u);
+    historyBox.appendChild(d);
+  });
+}
+
+function sendChat(e){
+  if(e.key!=="Enter")return;
+  const t=e.target.value.trim();
+  if(!t)return;
+  const m=document.createElement("div");
+  m.textContent=`${nickname}: ${t}`;
+  chatLog.appendChild(m);
+  chatLog.scrollTop=9999;
+  e.target.value="";
+}
+
+document.addEventListener("visibilitychange",()=>{
+  document.getElementById("tabStatus").innerHTML =
+    document.hidden
+    ? `<i class="fa fa-eye-slash"></i> tab lain`
+    : `<i class="fa fa-window-restore"></i> tab aktif`;
 });
 
-function saveHistory(s){
-history.unshift(s);
-history.splice(5);
-localStorage.setItem("history",JSON.stringify(history));
-}
+renderHistory();
 </script>
+
 </body>
 </html>
