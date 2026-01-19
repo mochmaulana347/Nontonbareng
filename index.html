@@ -8,87 +8,31 @@
 
 <style>
 :root{
-  --bg:#0f172a;
-  --card:#111827;
-  --primary:#6366f1;
-  --accent:#22c55e;
-  --warn:#f59e0b;
-  --danger:#ef4444;
-  --text:#e5e7eb;
+  --bg:#0f172a; --card:#111827; --primary:#6366f1;
+  --accent:#22c55e; --warn:#f59e0b; --danger:#ef4444;
 }
-*{box-sizing:border-box}
-body{
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font-family:Inter,system-ui,sans-serif;
-}
-.app{
-  display:grid;
-  grid-template-columns:1fr 320px;
-  height:100vh;
-}
-@media(max-width:900px){
-  .app{grid-template-columns:1fr}
-  .side{height:45vh}
-}
-.top{
-  padding:12px;
-  display:flex;
-  gap:10px;
-  background:var(--card);
-}
-input,button{
-  border-radius:10px;
-  border:none;
-  padding:12px;
-}
-input{flex:1}
-button{
-  background:var(--primary);
-  color:#fff;
-  font-weight:600;
-}
-#player{
-  height:55vh;
-  background:black;
-}
-.side{
-  display:flex;
-  flex-direction:column;
-  background:var(--card);
-}
-.users,.chat{
-  padding:12px;
-  overflow:auto;
-}
-.user{
-  font-size:13px;
-  margin-bottom:6px;
-}
-.watching{color:var(--accent)}
-.idle{color:var(--warn)}
-.away{color:var(--danger)}
-.chat-msg{
-  font-size:13px;
-  margin-bottom:6px;
-}
-.chat-input{
-  display:flex;
-  gap:8px;
-  padding:10px;
-}
-.voice{
-  background:var(--accent);
-  color:#000;
-}
+body{margin:0;background:var(--bg);color:#e5e7eb;font-family:sans-serif}
+.top{padding:12px;display:flex;gap:8px;background:var(--card)}
+input,button{padding:10px;border-radius:10px;border:none}
+button{background:var(--primary);color:white;font-weight:600}
+#player{height:55vh;background:black}
+.side{background:var(--card);height:45vh;display:flex;flex-direction:column}
+.users,.chat{padding:10px;overflow:auto}
+.chat-input{display:flex;gap:6px;padding:10px}
+.user.watching{color:var(--accent)}
+.user.idle{color:var(--warn)}
+.user.away{color:var(--danger)}
 </style>
 </head>
 
 <body>
-<div class="top">
-  <input id="name" placeholder="Nama">
-  <button onclick="join()">Join</button>
+
+<!-- LOGIN SEKALI -->
+<div id="login" style="position:fixed;inset:0;background:#000c;display:flex;align-items:center;justify-content:center">
+  <div style="background:var(--card);padding:20px;border-radius:16px">
+    <input id="name" placeholder="Nickname">
+    <button onclick="start()">Masuk</button>
+  </div>
 </div>
 
 <div class="top">
@@ -96,99 +40,89 @@ button{
   <button onclick="play()">Putar</button>
 </div>
 
-<div class="app">
-  <div>
-    <div id="player"></div>
-  </div>
+<div id="player"></div>
 
-  <div class="side">
-    <div class="users" id="users"></div>
-    <div class="chat" id="chat"></div>
-    <div class="chat-input">
-      <input id="msg" placeholder="Chat…">
-      <button onclick="sendChat()">➤</button>
-      <button class="voice" onmousedown="startVoice()" onmouseup="stopVoice()">🎤</button>
-    </div>
+<div class="side">
+  <div class="users" id="users"></div>
+  <div class="chat" id="chat"></div>
+  <div class="chat-input">
+    <input id="msg" placeholder="Chat">
+    <button onclick="sendChat()">➤</button>
+    <button onmousedown="rec()" onmouseup="stop()">🎤</button>
   </div>
 </div>
 
 <script>
 const socket = io();
-let myName = "";
-let recorder, stream;
+let myName="", recorder, chunks=[];
 
-function join(){
+/* JOIN SEKALI */
+function start(){
   myName = name.value;
   socket.emit("join", myName);
+  login.style.display="none";
 }
 
-function normalize(url){
-  if(url.includes("youtube")){
-    let id = url.includes("youtu.be")
-      ? url.split("youtu.be/")[1].split("?")[0]
-      : url.split("v=")[1].split("&")[0];
+/* VIDEO */
+function normalize(u){
+  if(u.includes("youtube")){
+    let id=u.includes("youtu.be")
+      ?u.split("youtu.be/")[1].split("?")[0]
+      :u.split("v=")[1].split("&")[0];
     return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`;
   }
-  return url;
+  return u;
 }
-
 function play(){
-  const src = normalize(document.getElementById("src").value);
-  socket.emit("video-action",{src,playing:true,time:0});
+  socket.emit("video-action",{src:normalize(src.value),playing:true});
 }
-
-socket.on("init-state", s => s.src && sync(s));
-socket.on("sync", s => sync(s));
+socket.on("init-state",s=>s.src&&sync(s));
+socket.on("sync",sync);
 
 function sync(s){
-  player.innerHTML = `
-    <iframe src="${s.src}"
-      allow="autoplay; fullscreen"
-      style="width:100%;height:100%;border:none"></iframe>`;
-  socket.emit("user-status", s.playing ? "watching":"idle");
+  player.innerHTML=`<iframe src="${s.src}" allow="autoplay;fullscreen"
+    style="width:100%;height:100%;border:none"></iframe>`;
+  socket.emit("user-status",s.playing?"watching":"idle");
 }
 
+/* USERS */
 document.addEventListener("visibilitychange",()=>{
-  socket.emit("user-status", document.hidden?"away":"watching");
+  socket.emit("user-status",document.hidden?"away":"watching");
 });
-
-socket.on("users", u=>{
-  users.innerHTML = Object.values(u).map(x=>
+socket.on("users",u=>{
+  users.innerHTML=Object.values(u).map(x=>
     `<div class="user ${x.status}">● ${x.name}</div>`
   ).join("");
 });
 
 /* CHAT */
 function sendChat(){
-  if(!msg.value) return;
-  chat.innerHTML += `<div class="chat-msg"><b>kamu:</b> ${msg.value}</div>`;
+  if(!msg.value)return;
+  chat.innerHTML+=`<div><b>kamu:</b> ${msg.value}</div>`;
   socket.emit("chat",{user:myName,msg:msg.value});
   msg.value="";
 }
 socket.on("chat",d=>{
-  chat.innerHTML += `<div class="chat-msg"><b>${d.user}:</b> ${d.msg}</div>`;
+  chat.innerHTML+=`<div><b>${d.user}:</b> ${d.msg}</div>`;
 });
 
-/* VOICE NOTE (push to talk) */
-async function startVoice(){
-  stream = await navigator.mediaDevices.getUserMedia({audio:true});
-  recorder = new MediaRecorder(stream);
-  let chunks=[];
+/* VOICE NOTE (FIXED) */
+async function rec(){
+  chunks=[];
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  recorder=new MediaRecorder(stream);
   recorder.ondataavailable=e=>chunks.push(e.data);
   recorder.onstop=()=>{
-    const blob = new Blob(chunks,{type:"audio/webm"});
-    blob.arrayBuffer().then(b=>{
-      socket.emit("voice",b);
-    });
+    const blob=new Blob(chunks,{type:"audio/webm"});
+    const reader=new FileReader();
+    reader.onload=()=>socket.emit("voice",reader.result);
+    reader.readAsDataURL(blob);
   };
   recorder.start();
 }
-function stopVoice(){
-  recorder && recorder.stop();
-  stream && stream.getTracks().forEach(t=>t.stop());
-}
-socket.on("voice",data=>{
-  const audio = new Audio(URL.createObjectURL(new Blob([data])));
+function stop(){recorder&&recorder.stop();}
+socket.on("voice",b64=>{
+  const audio=new Audio(b64);
   audio.play();
 });
 </script>
