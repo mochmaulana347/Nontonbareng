@@ -12,7 +12,9 @@
   --card:#FFFFFF;
   --pri:#3B82F6;
   --sec:#6366F1;
-  --acc:#22C55E;
+  --watch:#22C55E;
+  --idle:#FACC15;
+  --away:#EF4444;
   --text:#0F172A;
 }
 
@@ -30,14 +32,15 @@ body{
 
 #join .card{
   background:var(--card);
-  padding:24px;
-  border-radius:14px;
+  padding:26px;
+  border-radius:16px;
   box-shadow:0 20px 40px rgba(0,0,0,.08);
+  width:280px;
 }
 
 #app{
   display:none;
-  padding:12px;
+  padding:14px;
   max-width:1200px;
   margin:auto;
 }
@@ -47,12 +50,8 @@ body{
   gap:8px;
 }
 
-.top input{
-  flex:1;
-}
-
 input,button{
-  padding:10px;
+  padding:11px;
   border-radius:10px;
   border:1px solid #E5E7EB;
   font-size:14px;
@@ -62,39 +61,50 @@ button{
   background:var(--pri);
   color:white;
   border:none;
+  cursor:pointer;
 }
 
 iframe{
   width:100%;
   height:55vh;
-  margin-top:10px;
-  border-radius:16px;
+  margin-top:12px;
+  border-radius:18px;
   background:black;
+  border:none;
 }
 
 .panel{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:10px;
+  gap:12px;
+  margin-top:12px;
 }
 
 .card{
   background:var(--card);
-  border-radius:14px;
-  padding:10px;
+  border-radius:16px;
+  padding:12px;
 }
 
 .user{
-  font-size:13px;
   display:flex;
+  align-items:center;
   justify-content:space-between;
+  font-size:13px;
+  margin-top:6px;
+}
+
+.dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  margin-right:8px;
 }
 
 .chat{
   display:flex;
   flex-direction:column;
-  height:220px;
+  height:240px;
 }
 
 .chat-log{
@@ -110,6 +120,7 @@ iframe{
 
 @media(max-width:700px){
   .panel{grid-template-columns:1fr}
+  iframe{height:42vh}
 }
 </style>
 </head>
@@ -120,17 +131,17 @@ iframe{
   <div class="card">
     <h3>Join Nobar</h3>
     <input id="nick" placeholder="nickname">
-    <button id="joinBtn">Masuk</button>
+    <button id="joinBtn" style="width:100%;margin-top:10px">Masuk</button>
   </div>
 </div>
 
 <div id="app">
   <div class="top">
-    <input id="url" placeholder="Paste link video (embed)">
+    <input id="url" placeholder="Paste link video (YouTube / Vimeo / Embed)">
     <button id="playBtn">Putar</button>
   </div>
 
-  <iframe id="player" allow="autoplay"></iframe>
+  <iframe id="player" allow="autoplay; fullscreen"></iframe>
 
   <div class="panel">
     <div class="card">
@@ -163,11 +174,33 @@ document.getElementById("joinBtn").onclick = ()=>{
   app.style.display="block";
 };
 
+/* ================= AUTO EMBED ================= */
+function toEmbed(url){
+  try{
+    if(url.includes("youtube.com/watch")){
+      const id = new URL(url).searchParams.get("v");
+      return `https://www.youtube.com/embed/${id}?autoplay=1`;
+    }
+    if(url.includes("youtu.be")){
+      const id = url.split("/").pop();
+      return `https://www.youtube.com/embed/${id}?autoplay=1`;
+    }
+    if(url.includes("vimeo.com")){
+      const id = url.split("/").pop();
+      return `https://player.vimeo.com/video/${id}?autoplay=1`;
+    }
+    return url; // already embed / direct iframe
+  }catch{
+    return url;
+  }
+}
+
 playBtn.onclick = ()=>{
-  const u = url.value.trim();
-  if(!u) return;
-  socket.emit("set-video",u);
-  player.src=u;
+  const raw = url.value.trim();
+  if(!raw) return;
+  const embed = toEmbed(raw);
+  socket.emit("set-video", embed);
+  player.src = embed;
 };
 
 socket.on("sync", ({state,users})=>{
@@ -181,17 +214,26 @@ socket.on("set-video", u=>{
   player.src=u;
 });
 
+/* ================= USERS ================= */
 function renderUsers(u){
   users.innerHTML="";
   Object.values(u).forEach(x=>{
+    let color = "--watch";
+    if(x.status==="idle") color="--idle";
+    if(x.status==="away") color="--away";
+
     users.innerHTML+=`
       <div class="user">
-        <span>${x.nickname}</span>
-        <span>${x.status}</span>
+        <div style="display:flex;align-items:center">
+          <div class="dot" style="background:var(${color})"></div>
+          ${x.nickname}
+        </div>
+        <small>${x.status}</small>
       </div>`;
   });
 }
 
+/* ================= CHAT ================= */
 send.onclick = ()=>{
   if(!chatMsg.value) return;
   socket.emit("chat", chatMsg.value);
@@ -203,9 +245,13 @@ socket.on("chat", d=>{
   chatLog.scrollTop=9999;
 });
 
+/* ================= STATUS ================= */
 document.addEventListener("visibilitychange",()=>{
   socket.emit("status", document.hidden ? "idle" : "watching");
 });
+
+window.addEventListener("blur",()=>socket.emit("status","idle"));
+window.addEventListener("focus",()=>socket.emit("status","watching"));
 </script>
 
 </body>
