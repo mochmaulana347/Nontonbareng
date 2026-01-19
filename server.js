@@ -5,64 +5,26 @@ const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
-let users = {}; 
-let videoStatus = {
-    url: 'https://cdn.plyr.io/static/demo/View_From_A_Blue_Moon_Trailer-576p.mp4',
-    lastTime: 0,
-    lastUpdate: Date.now(),
-    playing: false,
-    adminId: null
-};
-
-// Fungsi menghitung waktu asli video saat ini di server
-function getEstimatedTime() {
-    if (!videoStatus.playing) return videoStatus.lastTime;
-    const elapsed = (Date.now() - videoStatus.lastUpdate) / 1000;
-    return videoStatus.lastTime + elapsed;
-}
+let users = {};
+let lastVideoState = { url: '', time: 0, playing: false };
 
 io.on('connection', (socket) => {
-    socket.on('join-room', (username) => {
-        users[socket.id] = { name: username, status: 'Watching', joinedAt: Date.now(), isAdmin: false };
-        const sorted = Object.entries(users).sort((a, b) => a[1].joinedAt - b[1].joinedAt);
-        videoStatus.adminId = sorted[0][0];
-        Object.keys(users).forEach(id => users[id].isAdmin = (id === videoStatus.adminId));
-
-        io.emit('update-users', { users: Object.values(users), adminId: videoStatus.adminId });
-
-        // Kirim status awal
-        socket.emit('video-control', {
-            action: 'change',
-            url: videoStatus.url,
-            time: getEstimatedTime(),
-            playing: videoStatus.playing
-        });
+    // Saat orang baru masuk
+    socket.on('join-room', (name) => {
+        users[socket.id] = { name: name };
+        io.emit('update-users', Object.values(users));
+        // Kirim status terakhir biar langsung sinkron
+        socket.emit('video-control', { ...lastVideoState, action: 'sync' });
     });
 
     socket.on('video-control', (data) => {
-        if (socket.id === videoStatus.adminId) {
-            videoStatus.lastTime = data.time || 0;
-            videoStatus.lastUpdate = Date.now();
-            if (data.action === 'play') videoStatus.playing = true;
-            if (data.action === 'pause') videoStatus.playing = false;
-            if (data.url) videoStatus.url = data.url;
+        // Simpan status terakhir di server
+        if (data.url) lastVideoState.url = data.url;
+        if (data.time !== undefined) lastVideoState.time = data.time;
+        lastVideoState.playing = (data.action === 'play');
 
-            socket.broadcast.emit('video-control', data);
-        }
-    });
-
-    // Admin lapor posisi secara berkala (Heartbeat)
-    socket.on('heartbeat', (time) => {
-        if (socket.id === videoStatus.adminId) {
-            videoStatus.lastTime = time;
-            videoStatus.lastUpdate = Date.now();
-        }
-    });
-
-    socket.on('claim-admin', () => {
-        videoStatus.adminId = socket.id;
-        Object.keys(users).forEach(id => users[id].isAdmin = (id === videoStatus.adminId));
-        io.emit('update-users', { users: Object.values(users), adminId: videoStatus.adminId });
+        // Kirim ke semua orang KECUALI pengirimnya
+        socket.broadcast.emit('video-control', data);
     });
 
     socket.on('new-message', (msg) => {
@@ -71,10 +33,9 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         delete users[socket.id];
-        const remaining = Object.entries(users).sort((a, b) => a[1].joinedAt - b[1].joinedAt);
-        if (remaining.length > 0) videoStatus.adminId = remaining[0][0];
-        io.emit('update-users', { users: Object.values(users), adminId: videoStatus.adminId });
+        io.emit('update-users', Object.values(users));
     });
 });
 
 http.listen(process.env.PORT || 3000);
+
