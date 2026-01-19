@@ -12,7 +12,7 @@ let roomState = {
   src: "",
   time: 0,
   playing: false,
-  updatedAt: Date.now()
+  updatedAt: 0
 };
 
 let users = {};
@@ -26,7 +26,6 @@ io.on("connection", socket => {
   });
 
   socket.on("video-action", data => {
-    // ⛔ cegah spam state lama
     if (Date.now() - roomState.updatedAt < 300) return;
 
     roomState = {
@@ -37,6 +36,14 @@ io.on("connection", socket => {
     };
 
     socket.broadcast.emit("sync", roomState);
+  });
+
+  socket.on("chat", msg => {
+    socket.broadcast.emit("chat", msg);
+  });
+
+  socket.on("voice", data => {
+    socket.broadcast.emit("voice", data);
   });
 
   socket.on("user-status", status => {
