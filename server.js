@@ -6,49 +6,45 @@ const io = require("socket.io")(http);
 app.use(express.static(__dirname));
 
 let roomState = {
-  vid: "dQw4w9WgXcQ",
+  src: "",
   time: 0,
-  playing: false,
-  lastUpdate: Date.now()
+  playing: false
 };
 
 io.on("connection", socket => {
-  socket.emit("init-state", roomState);
+  socket.emit("init", roomState);
 
-  socket.on("join-room", name => {
-    socket.userName = name;
-    socket.userState = "watching";
-    updateUsers();
+  socket.on("join", name => {
+    socket.name = name;
+    socket.state = "watching";
+    update();
   });
 
-  socket.on("video-command", data => {
-    roomState = { ...roomState, ...data, lastUpdate: Date.now() };
-    socket.broadcast.emit("video-sync", roomState);
+  socket.on("video", data => {
+    roomState = { ...roomState, ...data };
+    socket.broadcast.emit("sync", roomState);
   });
 
-  socket.on("user-state", state => {
-    socket.userState = state;
-    updateUsers();
+  socket.on("state", s => {
+    socket.state = s;
+    update();
   });
 
-  socket.on("chat-send", msg => {
-    socket.broadcast.emit("chat-receive", {
-      user: socket.userName,
-      msg
-    });
+  socket.on("chat", msg => {
+    socket.broadcast.emit("chat", { user: socket.name, msg });
   });
 
-  socket.on("disconnect", updateUsers);
+  socket.on("disconnect", update);
 
-  function updateUsers() {
+  function update() {
     const users = [];
     for (let [, s] of io.sockets.sockets) {
-      if (s.userName)
-        users.push({ name: s.userName, state: s.userState });
+      if (s.name) users.push({ name: s.name, state: s.state });
     }
-    io.emit("user-list", users);
+    io.emit("users", users);
   }
 });
 
-const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log("Server ready on " + PORT));
+http.listen(process.env.PORT || 3000, () =>
+  console.log("Server ready")
+);
