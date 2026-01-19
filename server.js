@@ -7,52 +7,48 @@ app.use(express.static(__dirname));
 
 let roomState = {
   vid: "dQw4w9WgXcQ",
-  startedAt: null
+  time: 0,
+  playing: false,
+  lastUpdate: Date.now()
 };
 
-let users = {};
+io.on("connection", socket => {
+  socket.emit("init-state", roomState);
 
-io.on("connection", (socket) => {
-  socket.emit("video-sync", roomState);
-
-  socket.on("join", (name) => {
-    users[socket.id] = {
-      name,
-      watching: true
-    };
-    io.emit("users", users);
+  socket.on("join-room", name => {
+    socket.userName = name;
+    socket.userState = "watching";
+    updateUsers();
   });
 
-  socket.on("visibility", (watching) => {
-    if (users[socket.id]) {
-      users[socket.id].watching = watching;
-      io.emit("users", users);
-    }
+  socket.on("video-command", data => {
+    roomState = { ...roomState, ...data, lastUpdate: Date.now() };
+    socket.broadcast.emit("video-sync", roomState);
   });
 
-  socket.on("chat", (msg) => {
-    if (!users[socket.id]) return;
-    io.emit("chat", {
-      user: users[socket.id].name,
+  socket.on("user-state", state => {
+    socket.userState = state;
+    updateUsers();
+  });
+
+  socket.on("chat-send", msg => {
+    socket.broadcast.emit("chat-receive", {
+      user: socket.userName,
       msg
     });
   });
 
-  socket.on("start-video", (data) => {
-    roomState = {
-      vid: data.vid,
-      startedAt: Date.now()
-    };
-    io.emit("video-sync", roomState);
-  });
+  socket.on("disconnect", updateUsers);
 
-  socket.on("disconnect", () => {
-    delete users[socket.id];
-    io.emit("users", users);
-  });
+  function updateUsers() {
+    const users = [];
+    for (let [, s] of io.sockets.sockets) {
+      if (s.userName)
+        users.push({ name: s.userName, state: s.userState });
+    }
+    io.emit("user-list", users);
+  }
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () =>
-  console.log("Watch Party running on", PORT)
-);
+http.listen(PORT, () => console.log("Server ready on " + PORT));
