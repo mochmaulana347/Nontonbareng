@@ -1,38 +1,139 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-    <title>Watch Party + Chat</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Party Cinematic</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { background: #0f172a; color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .main-layout { display: flex; gap: 20px; max-width: 1200px; width: 100%; }
-        
-        /* Bagian Video */
-        .video-section { flex: 2; background: #1e293b; padding: 20px; border-radius: 15px; }
-        input { padding: 10px; border-radius: 5px; border: none; width: 70%; margin-bottom: 10px; }
-        button { padding: 10px; border-radius: 5px; background: #3b82f6; color: white; border: none; cursor: pointer; }
+        /* CSS DESAIN CINEMATIC */
+        body {
+            background-color: #050505;
+            color: #ffffff;
+            font-family: 'Inter', -apple-system, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
 
-        /* Bagian Chat */
-        .chat-section { flex: 1; background: #1e293b; padding: 20px; border-radius: 15px; display: flex; flex-direction: column; height: 500px; }
-        #chat-box { flex: 1; overflow-y: auto; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-right: 5px; }
-        .msg { margin-bottom: 8px; font-size: 14px; background: #334155; padding: 8px; border-radius: 8px; width: fit-content; }
-        .msg b { color: #60a5fa; }
+        /* Container Utama di Tengah */
+        .main-container {
+            width: 90%;
+            max-width: 900px;
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-weight: 800;
+            letter-spacing: -1px;
+            background: linear-gradient(to right, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+
+        /* Player YouTube di Tengah */
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%; /* Ratio 16:9 */
+            height: 0;
+            overflow: hidden;
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(59, 130, 246, 0.2);
+            background: #000;
+            margin-bottom: 25px;
+        }
+
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Panel Kontrol & Chat */
+        .controls-panel {
+            background: rgba(30, 30, 30, 0.6);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex: 1;
+            background: #111;
+            border: 1px solid #333;
+            padding: 12px 15px;
+            border-radius: 12px;
+            color: white;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        input:focus { border-color: #3b82f6; }
+
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover { background: #2563eb; transform: translateY(-2px); }
+
+        /* Chat Box */
+        #chat-box {
+            height: 150px;
+            overflow-y: auto;
+            text-align: left;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            font-size: 14px;
+        }
+
+        .msg { margin-bottom: 8px; line-height: 1.4; }
+        .msg span { color: #3b82f6; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="main-layout">
-        <div class="video-section">
-            <h2>🎥 Streaming Room</h2>
-            <input type="text" id="urlInput" placeholder="Tempel ID Video YouTube (Contoh: dQw4w9WgXcQ)">
-            <button onclick="changeVideo()">Ganti Video</button>
+
+    <div class="main-container">
+        <h1>Watch Party</h1>
+
+        <div class="video-wrapper">
             <div id="player"></div>
         </div>
 
-        <div class="chat-section">
-            <h3>💬 Chat Bareng</h3>
+        <div class="controls-panel">
+            <div class="input-group">
+                <input type="text" id="urlInput" placeholder="Tempel ID YouTube (contoh: dQw4w9WgXcQ)">
+                <button onclick="changeVideo()">Ganti Video</button>
+            </div>
+
             <div id="chat-box"></div>
-            <div style="display: flex; gap: 5px;">
-                <input type="text" id="chatInput" placeholder="Ketik pesan..." style="width: 100%;">
+
+            <div class="input-group">
+                <input type="text" id="chatInput" placeholder="Ketik pesan obrolan...">
                 <button onclick="sendChat()">Kirim</button>
             </div>
         </div>
@@ -42,19 +143,19 @@
         const socket = io();
         let player, isSyncing = false;
 
-        // Load YouTube API
+        // Load API YouTube
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         document.body.appendChild(tag);
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
-                height: '360', width: '100%', videoId: 'dQw4w9WgXcQ',
+                height: '100%', width: '100%', videoId: 'dQw4w9WgXcQ',
+                playerVars: { 'rel': 0, 'modestbranding': 1 },
                 events: { 'onStateChange': onPlayerStateChange }
             });
         }
 
-        // Kontrol Video
         function onPlayerStateChange(event) {
             if (isSyncing) return;
             const time = player.getCurrentTime();
@@ -69,22 +170,20 @@
             player.loadVideoById(vid);
         }
 
-        // Fitur Chat
         function sendChat() {
             const msg = document.getElementById('chatInput').value;
             if(!msg) return;
-            socket.emit('new-message', msg); // Kirim pesan ke server
-            addMessage("Kamu", msg); // Munculkan di layar sendiri
+            socket.emit('new-message', msg);
+            addMessage("Kamu", msg);
             document.getElementById('chatInput').value = "";
         }
 
         function addMessage(user, text) {
             const box = document.getElementById('chat-box');
-            box.innerHTML += `<div class="msg"><b>${user}:</b> ${text}</div>`;
+            box.innerHTML += `<div class="msg"><span>${user}:</span> ${text}</div>`;
             box.scrollTop = box.scrollHeight;
         }
 
-        // Menerima Sinyal dari Server
         socket.on('video-control', (data) => {
             isSyncing = true;
             if (data.action === 'play') { player.seekTo(data.time); player.playVideo(); }
@@ -93,11 +192,8 @@
             setTimeout(() => isSyncing = false, 600);
         });
 
-        socket.on('chat-receive', (msg) => {
-            addMessage("Dia", msg);
-        });
+        socket.on('chat-receive', (msg) => { addMessage("Dia", msg); });
 
-        // Kirim chat kalau tekan Enter
         document.getElementById('chatInput').addEventListener("keyup", (e) => {
             if (e.key === "Enter") sendChat();
         });
