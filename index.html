@@ -1,79 +1,55 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party - Final Logic</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
-    <style>
-        body { background: #000; color: #fff; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        .nav { padding: 15px; display: flex; gap: 10px; background: #111; z-index: 10; }
-        input { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #333; background: #222; color: #fff; }
-        button { padding: 10px 20px; background: #3b82f6; border: none; color: #fff; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .video-container { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
-        #overlay-sync { position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 20; display: none; flex-direction: column; align-items: center; justify-content: center; }
-        .plyr { width: 100%; max-width: 1000px; }
-    </style>
-</head>
-<body>
+const express = require('express');
+const app = express();
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
 
-<div class="nav">
-    <input type="text" id="urlInput" placeholder="Tempel link YouTube atau MP4...">
-    <button onclick="changeVideo()">Putar</button>
-</div>
+app.use(express.static(__dirname));
 
-<div class="video-container">
-    <div id="overlay-sync">
-        <h3 id="status-msg">Menghubungkan ke Room...</h3>
-        <button onclick="startWatching()" style="background: #22c55e; padding: 15px 40px; font-size: 1.2rem;">GABUNG NONTON</button>
-    </div>
-    <div id="player-wrapper" style="width: 100%; max-width: 1000px;">
-        <div id="player" data-plyr-provider="youtube" data-plyr-embed-id="aqz-KE-bpKQ"></div>
-    </div>
-</div>
+let users = {};
+let roomState = {
+    url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
+    time: 0,
+    playing: false,
+    updatedAt: Date.now()
+};
 
-<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
-<script>
-    const socket = io();
-    let player = new Plyr('#player', { ratio: '16:9' });
-    let isLock = false; 
-    let initialData = null;
-
-    // 1. Join Room & Minta Status
-    socket.emit('join-room');
-
-    socket.on('video-command', (data) => {
-        if (data.action === 'initial-sync') {
-            initialData = data;
-            document.getElementById('overlay-sync').style.display = 'flex';
-            document.getElementById('status-msg').innerText = "Video sedang berjalan!";
-        } else {
-            applyRemoteAction(data);
+io.on('connection', (socket) => {
+    socket.on('join-room', (name) => {
+        users[socket.id] = { name: name, joinedAt: Date.now() };
+        
+        // Hitung estimasi waktu sekarang untuk yang baru join
+        let estimatedTime = roomState.time;
+        if (roomState.playing) {
+            estimatedTime += (Date.now() - roomState.updatedAt) / 1000;
         }
+
+        io.emit('update-users', Object.values(users));
+        socket.emit('video-command', {
+            action: 'initial-sync',
+            url: roomState.url,
+            time: estimatedTime,
+            playing: roomState.playing
+        });
     });
 
-    // 2. Klik Tombol Gabung Nonton (Initial Sync)
-    function startWatching() {
-        document.getElementById('overlay-sync').style.display = 'none';
-        if (initialData) {
-            applyRemoteAction(initialData);
-        }
-    }
+    socket.on('video-command', (data) => {
+        roomState = {
+            url: data.url || roomState.url,
+            time: data.time,
+            playing: (data.action === 'play'),
+            updatedAt: Date.now()
+        };
+        socket.broadcast.emit('video-command', data);
+    });
 
-    // 3. Fungsi Ganti Video
-    function changeVideo(url, fromRemote = false) {
-        const src = url || document.getElementById('urlInput').value;
-        if (!src) return;
+    socket.on('new-message', (msg) => {
+        socket.broadcast.emit('chat-receive', { user: users[socket.id]?.name || "Anonim", msg });
+    });
 
-        isLock = true;
-        const isYoutube = src.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.*$/);
-        
-        if (isYoutube) {
-            const ytId = src.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/)[7];
-            player.source = { type: 'video', sources: [{ src: ytId, provider: 'youtube' }] };
-        } else {
-            player.source = { type: 'video', sources: [{ src: src, type: 'video/mp4' }] };
-        }
+    socket.on('disconnect', () => {
+        delete users[socket.id];
+        io.emit('update-users', Object.values(users));
+    });
+});
 
-        if
+http.listen(process.env.PORT || 3000);
