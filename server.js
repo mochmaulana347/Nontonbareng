@@ -8,60 +8,66 @@ const io = new Server(server);
 
 app.use(express.static(__dirname));
 
-let sharedState = {
+let state = {
   videoUrl: "",
-  currentTime: 0,
+  time: 0,
   playing: false
 };
 
-io.on("connection", (socket) => {
-  console.log("connect:", socket.id);
+let users = {};
+
+io.on("connection", socket => {
 
   socket.on("join", ({ nickname }) => {
     if (!nickname) return;
 
-    socket.nickname = nickname;
-
-    // kirim state saat ini ke user baru
-    socket.emit("sync-state", sharedState);
-
-    io.emit("user-status", {
-      id: socket.id,
+    users[socket.id] = {
       nickname,
       status: "watching"
-    });
+    };
+
+    socket.emit("sync", { state, users });
+    io.emit("users", users);
   });
 
-  socket.on("set-video", (url) => {
-    sharedState.videoUrl = url;
-    sharedState.currentTime = 0;
-    sharedState.playing = true;
-
-    socket.broadcast.emit("set-video", url);
+  socket.on("set-video", url => {
+    state.videoUrl = url;
+    state.time = 0;
+    state.playing = true;
+    io.emit("set-video", url);
   });
 
-  socket.on("play", (time) => {
-    sharedState.playing = true;
-    sharedState.currentTime = time;
+  socket.on("play", time => {
+    state.playing = true;
+    state.time = time;
     socket.broadcast.emit("play", time);
   });
 
-  socket.on("pause", (time) => {
-    sharedState.playing = false;
-    sharedState.currentTime = time;
+  socket.on("pause", time => {
+    state.playing = false;
+    state.time = time;
     socket.broadcast.emit("pause", time);
   });
 
-  socket.on("disconnect", () => {
-    if (!socket.nickname) return;
-    io.emit("user-status", {
-      id: socket.id,
-      nickname: socket.nickname,
-      status: "left"
+  socket.on("status", status => {
+    if (users[socket.id]) {
+      users[socket.id].status = status;
+      io.emit("users", users);
+    }
+  });
+
+  socket.on("chat", msg => {
+    if (!users[socket.id]) return;
+    io.emit("chat", {
+      nickname: users[socket.id].nickname,
+      msg
     });
+  });
+
+  socket.on("disconnect", () => {
+    delete users[socket.id];
+    io.emit("users", users);
   });
 });
 
-server.listen(process.env.PORT || 3000, () => {
-  console.log("server running");
-});
+server.listen(process.env.PORT || 3000);
