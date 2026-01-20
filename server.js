@@ -12,15 +12,10 @@ io.on('connection', (socket) => {
         users[socket.id] = { name, color: '#' + Math.floor(Math.random()*16777215).toString(16) };
         io.emit('update-users', Object.values(users));
     });
-
-    socket.on('video-control', (data) => {
-        socket.broadcast.emit('video-control', data);
-    });
-
+    socket.on('video-control', (data) => { socket.broadcast.emit('video-control', data); });
     socket.on('new-message', (data) => {
         socket.broadcast.emit('chat-receive', { ...data, color: users[socket.id]?.color });
     });
-
     socket.on('disconnect', () => {
         delete users[socket.id];
         io.emit('update-users', Object.values(users));
@@ -28,4 +23,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log(`Server Ready di Port ${PORT}`));
+http.listen(PORT, () => console.log(`Server aktif di port ${PORT}`));
