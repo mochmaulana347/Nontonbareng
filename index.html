@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="referrer" content="no-referrer" />
-    <title>Watch Party Ultra Pro</title>
+    <title>Watch Party Pro</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
@@ -14,12 +14,10 @@
         * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
         body, html { background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; height: 100%; width: 100%; overflow: hidden; }
 
-        .app-layout { position: relative; height: 100vh; width: 100vw; display: flex; flex-direction: column; z-index: 1; }
-        .video-section { position: absolute; inset: 0; display: flex; flex-direction: column; background: #000; z-index: 1; }
+        .app-layout { position: relative; height: 100vh; width: 100vw; display: flex; flex-direction: column; }
+        .video-section { position: absolute; inset: 0; display: flex; flex-direction: column; background: #000; }
         
-        /* Nav Bar Auto-Hide Style */
-        .nav-bar { padding: 10px; display: flex; gap: 8px; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); z-index: 1000; position: relative; transition: 0.3s opacity; }
-        .nav-bar:hover { opacity: 1; }
+        .nav-bar { padding: 10px; display: flex; gap: 8px; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); z-index: 1000; position: relative; }
         .nav-bar input { background: rgba(255,255,255,0.08); border: 1px solid #333; padding: 10px; border-radius: 12px; color: #fff; flex: 1; font-size: 13px; }
         .btn-putar { background: var(--tertiary); color: #fff; border: none; padding: 0 18px; border-radius: 12px; font-weight: 800; cursor: pointer; }
 
@@ -27,9 +25,9 @@
         #dplayer, #yt-player { width: 100% !important; height: 100% !important; position: absolute !important; top:0; left:0; }
         .hidden { display: none !important; }
 
-        /* LED Users Melayang dengan Pulse */
+        /* LED Status Melayang */
         .online-status { position: absolute; top: 70px; right: 15px; display: flex; flex-direction: column; gap: 10px; z-index: 900; }
-        .user-dot { width: 38px; height: 38px; border-radius: 12px; background: var(--card); border: 1px solid #444; display: flex; align-items: center; justify-content: center; font-weight: 800; position: relative; font-size: 13px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .user-dot { width: 38px; height: 38px; border-radius: 12px; background: var(--card); border: 1px solid #444; display: flex; align-items: center; justify-content: center; font-weight: 800; position: relative; font-size: 13px; }
         .led { width: 10px; height: 10px; border-radius: 50%; position: absolute; top: -3px; right: -3px; border: 2px solid var(--bg); }
         .led-active { background: var(--active); box-shadow: 0 0 10px var(--active); animation: pulseLed 2s infinite; }
         .led-away { background: #555; }
@@ -44,27 +42,30 @@
         .chat-header { padding: 15px; background: #1e1e21; font-weight: 800; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; letter-spacing: 1px; color: #888; }
         #chat-content { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; background: #0c0c0e; scroll-behavior: smooth; }
         
-        /* Message & Log Styles */
-        .msg { background: #1e1e21; padding: 10px 14px; border-radius: 15px; max-width: 85%; align-self: flex-start; font-size: 13px; border: 1px solid #2d2d31; }
-        .msg.me { align-self: flex-end; background: var(--tertiary); border: none; color: #fff; border-bottom-right-radius: 2px; }
+        .msg { background: #1e1e21; padding: 10px 14px; border-radius: 15px; max-width: 85%; align-self: flex-start; font-size: 13px; }
+        .msg.me { align-self: flex-end; background: var(--tertiary); color: #fff; border-bottom-right-radius: 2px; }
         .msg b { display: block; font-size: 9px; margin-bottom: 3px; opacity: 0.6; text-transform: uppercase; }
-        .log-msg { align-self: center; font-size: 9px; color: #555; background: rgba(255,255,255,0.03); padding: 5px 12px; border-radius: 20px; margin: 4px 0; letter-spacing: 0.5px; }
+        .log-msg { align-self: center; font-size: 9px; color: #555; background: rgba(255,255,255,0.03); padding: 5px 12px; border-radius: 20px; margin: 4px 0; }
 
-        .input-area { padding: 12px; background: var(--card); border-top: 1px solid #333; display: flex; gap: 10px; align-items: center; }
+        .input-area { padding: 12px; background: var(--card); border-top: 1px solid #333; display: flex; gap: 10px; }
         .input-area input { flex: 1; background: #000; border: 1px solid #333; padding: 12px; border-radius: 14px; color: #fff; font-size: 14px; }
-        .btn-act { width: 42px; height: 42px; border-radius: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #fff; transition: 0.2s; }
+        
+        /* Mic Style Fixed */
+        #btnVn { 
+            width: 42px; height: 42px; border-radius: 14px; border: none; cursor: pointer; color: #fff; 
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+        }
+        .recording-pulse { animation: pulseRed 1s infinite; }
+        @keyframes pulseRed { 0% { transform: scale(1); } 50% { transform: scale(1.1); box-shadow: 0 0 15px rgba(255, 71, 87, 0.5); } 100% { transform: scale(1); } }
 
         .reaksi-quick { position: fixed; bottom: 35px; left: 20px; display: flex; gap: 12px; z-index: 1000; }
-        .reaksi-btn { background: rgba(0,0,0,0.5); border: 1px solid #333; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(10px); transition: 0.2s; font-size: 20px; }
-        .reaksi-btn:active { transform: scale(1.4); }
+        .reaksi-btn { background: rgba(0,0,0,0.5); border: 1px solid #333; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(10px); font-size: 20px; }
 
         #reaksi-layer { position: absolute; inset: 0; pointer-events: none; z-index: 800; }
-        .emo-fly { position: absolute; bottom: 20%; font-size: 45px; animation: fly 2s ease-out forwards; z-index: 800; }
-        @keyframes fly { 0% { transform: translateY(0) scale(0); opacity: 0; } 30% { opacity: 1; transform: scale(1.2); } 100% { transform: translateY(-350px) rotate(15deg); opacity: 0; } }
+        .emo-fly { position: absolute; bottom: 20%; font-size: 45px; animation: fly 2s ease-out forwards; }
+        @keyframes fly { 0% { transform: translateY(0) scale(0); opacity: 0; } 30% { opacity: 1; transform: scale(1.2); } 100% { transform: translateY(-350px); opacity: 0; } }
 
-        @media (max-width: 500px) {
-            .chat-popup { width: calc(100% - 30px); height: 60vh; bottom: 100px; right: 15px; }
-        }
+        @media (max-width: 500px) { .chat-popup { width: calc(100% - 30px); height: 60vh; bottom: 100px; right: 15px; } }
     </style>
 </head>
 <body>
@@ -72,15 +73,14 @@
 <div id="login" style="position:fixed; inset:0; z-index:10000; background:var(--bg); display:flex; align-items:center; justify-content:center;">
     <div style="background:var(--card); padding:40px; border-radius:28px; text-align:center; width: 320px; border: 1px solid #333;">
         <h2 style="margin:0 0 10px; color:#fff; font-weight:800;">Watch Party</h2>
-        <p style="color:#666; font-size:12px; margin-bottom:25px;">Enter your name to join the room</p>
-        <input type="text" id="user-name" placeholder="Username..." style="width:100%; padding:14px; background:#000; border:1px solid #444; color:#fff; border-radius:15px; text-align:center; margin-bottom:20px;">
-        <button onclick="gabung()" style="width:100%; padding:14px; background:var(--tertiary); color:#fff; border:none; border-radius:15px; font-weight:800; cursor:pointer; box-shadow: 0 10px 20px rgba(229, 49, 112, 0.3);">MASUK</button>
+        <input type="text" id="user-name" placeholder="Nama kamu..." style="width:100%; padding:14px; background:#000; border:1px solid #444; color:#fff; border-radius:15px; text-align:center; margin-bottom:20px;">
+        <button onclick="gabung()" style="width:100%; padding:14px; background:var(--tertiary); color:#fff; border:none; border-radius:15px; font-weight:800; cursor:pointer;">MASUK</button>
     </div>
 </div>
 
 <div class="video-section">
-    <div class="nav-bar" id="mainNav">
-        <input type="text" id="inputUrl" placeholder="Paste Video/YouTube Link...">
+    <div class="nav-bar">
+        <input type="text" id="inputUrl" placeholder="Tempel Link Video (Direct/YouTube)...">
         <button class="btn-putar" onclick="putarSekarang()">PLAY</button>
     </div>
     <div class="player-wrapper">
@@ -98,26 +98,23 @@
 </div>
 
 <div class="chat-bubble-toggle" onclick="toggleChat()">
-    💬
-    <div id="chat-badge" class="badge">0</div>
+    💬 <div id="chat-badge" class="badge">0</div>
 </div>
 
 <div class="chat-popup" id="chatPopup">
-    <div class="chat-header">
-        <span>ROOM CHAT</span>
-        <span onclick="toggleChat()" style="cursor:pointer; font-size: 18px; padding: 5px;">✕</span>
-    </div>
+    <div class="chat-header"><span>ROOM CHAT</span><span onclick="toggleChat()" style="cursor:pointer;">✕</span></div>
     <div id="chat-content"></div>
     <div class="input-area">
-        <button class="btn-act" style="background:#22c55e" id="btnVn" onmousedown="mulaiVn()" onmouseup="stopVn()" ontouchstart="mulaiVn()" ontouchend="stopVn()">🎤</button>
-        <input type="text" id="inputChat" placeholder="Say something..." onkeypress="if(event.key==='Enter') kirimChat()">
-        <button class="btn-act" style="background:var(--tertiary)" onclick="kirimChat()">➤</button>
+        <button id="btnVn" style="background:#22c55e" onclick="handleMicClick()">🎤</button>
+        <input type="text" id="inputChat" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') kirimChat()">
+        <button onclick="kirimChat()" style="background:var(--tertiary); border:none; border-radius:14px; width:42px; color:white;">➤</button>
     </div>
 </div>
 
 <script>
     const socket = io();
-    let dp, ytPlayer, isSync = false, mediaRec, audioChunks = [], unreadCount = 0, isChatOpen = false;
+    let dp, ytPlayer, isSync = false, unreadCount = 0, isChatOpen = false;
+    let isRecording = false, mediaRecorder, audioChunks = [];
 
     // Load saved name
     document.getElementById('user-name').value = localStorage.getItem('wp_name') || '';
@@ -130,8 +127,7 @@
 
     function toggleChat() {
         isChatOpen = !isChatOpen;
-        const p = document.getElementById('chatPopup');
-        p.style.display = isChatOpen ? 'flex' : 'none';
+        document.getElementById('chatPopup').style.display = isChatOpen ? 'flex' : 'none';
         if(isChatOpen) {
             unreadCount = 0;
             document.getElementById('chat-badge').style.display = 'none';
@@ -146,17 +142,41 @@
         localStorage.setItem('wp_name', n);
         socket.emit('join', n);
         document.getElementById('login').style.display = 'none';
-        document.addEventListener('visibilitychange', () => {
-            socket.emit('presence-change', document.visibilityState === 'visible' ? 'active' : 'away');
-        });
+    }
+
+    // --- REKAMAN MIC (TOGGLE) ---
+    async function handleMicClick() {
+        const btn = document.getElementById('btnVn');
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => {
+                        socket.emit('new-message', { name: document.getElementById('user-name').value, audio: reader.result, type: 'audio' });
+                        renderMsg("me", "Kamu", reader.result, "audio");
+                    };
+                    stream.getTracks().forEach(t => t.stop());
+                };
+                mediaRecorder.start();
+                isRecording = true;
+                btn.style.background = "#ff4757"; btn.innerHTML = "⏹️"; btn.classList.add("recording-pulse");
+            } catch (err) { alert("Mic Error: Gunakan HTTPS dan beri izin mic!"); }
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            btn.style.background = "#22c55e"; btn.innerHTML = "🎤"; btn.classList.remove("recording-pulse");
+        }
     }
 
     socket.on('update-users', list => {
         document.getElementById('user-list').innerHTML = list.map(u => `
-            <div class="user-dot" style="border-color: ${u.color}">
-                ${u.name[0].toUpperCase()}
-                <div class="led ${u.status === 'active' ? 'led-active' : 'led-away'}"></div>
-            </div>
+            <div class="user-dot" style="border-color: ${u.color}">${u.name[0].toUpperCase()}<div class="led led-active"></div></div>
         `).join('');
     });
 
@@ -228,25 +248,8 @@
         renderMsg("me", "Kamu", i.value, "text"); i.value = "";
     }
 
-    async function mulaiVn() {
-        try {
-            const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRec = new MediaRecorder(s);
-            document.getElementById('btnVn').style.background = "#ff4757"; audioChunks = [];
-            mediaRec.ondataavailable = e => audioChunks.push(e.data);
-            mediaRec.onstop = () => {
-                const b = new Blob(audioChunks, { type: 'audio/ogg' });
-                const r = new FileReader(); r.readAsDataURL(b);
-                r.onloadend = () => {
-                    socket.emit('new-message', { name: document.getElementById('user-name').value, audio: r.result, type: 'audio' });
-                    renderMsg("me", "Kamu", r.result, "audio");
-                };
-            }; mediaRec.start();
-        } catch(e) {}
-    }
-    function stopVn() { if(mediaRec) { mediaRec.stop(); document.getElementById('btnVn').style.background = "#22c55e"; } }
-
     socket.on('chat-receive', d => renderMsg("other", d.name, d.text || d.audio, d.type, d.color));
+    
     function renderMsg(side, name, cont, type, color) {
         const box = document.getElementById('chat-content');
         if(side === 'system') {
