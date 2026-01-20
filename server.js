@@ -4,7 +4,6 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
-
 let users = {};
 
 io.on('connection', (socket) => {
@@ -23,4 +22,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log(`Server aktif di port ${PORT}`));
+http.listen(PORT, () => console.log(`Server Ready di Port ${PORT}`));
