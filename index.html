@@ -4,87 +4,164 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer" />
-    <title>Watch Party Pro</title>
+    <title>Watch Party Pro - Premium</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0f0e17; --headline: #fffffe; --paragraph: #a7a9be; --tertiary: #e53170; --card: #16161a; }
+        :root { --bg: #0a0a0c; --headline: #ffffff; --paragraph: #a7a9be; --tertiary: #e53170; --card: #16161a; --active: #2ecc71; --away: #95a5a6; }
         * { box-sizing: border-box; }
-        body { background: var(--bg); color: var(--paragraph); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; overflow: hidden; height: 100vh; }
-        .app-layout { display: flex; height: 100vh; }
-        .video-main { flex: 3; display: flex; flex-direction: column; background: #000; position: relative; }
-        .nav-bar { padding: 15px; display: flex; gap: 10px; background: var(--card); border-bottom: 1px solid #242629; z-index: 100; }
-        input { background: #000; border: 1px solid #333; padding: 10px; border-radius: 8px; color: #fff; flex: 1; outline: none; }
-        button { border: none; padding: 0 20px; border-radius: 8px; cursor: pointer; font-weight: bold; height: 40px; }
+        body { background: var(--bg); color: var(--paragraph); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; height: 100vh; overflow: hidden; }
+        
+        .app-layout { display: flex; height: 100vh; width: 100vw; }
+        
+        /* Video Area */
+        .video-main { flex: 3; display: flex; flex-direction: column; background: #000; border-right: 1px solid #242629; }
+        .nav-bar { padding: 12px 20px; display: flex; gap: 10px; background: var(--card); align-items: center; }
+        input { background: #000; border: 1px solid #333; padding: 12px; border-radius: 10px; color: #fff; flex: 1; outline: none; transition: 0.3s; }
+        input:focus { border-color: var(--tertiary); box-shadow: 0 0 10px rgba(229, 49, 112, 0.2); }
+        button { border: none; padding: 0 25px; border-radius: 10px; cursor: pointer; font-weight: bold; height: 45px; transition: 0.3s; }
         .btn-main { background: var(--tertiary); color: #fff; }
-        .player-container { flex: 1; position: relative; background: #000; }
-        #dplayer { width: 100%; height: 100%; }
+        .btn-main:hover { opacity: 0.8; transform: translateY(-2px); }
+
+        .player-container { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #000; }
+        #dplayer { width: 100%; height: 100% !important; }
         #yt-player { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 50; }
         .hidden { display: none !important; }
-        .system-logs { padding: 8px 15px; background: rgba(0,0,0,0.9); font-size: 12px; color: var(--tertiary); font-weight: bold; }
-        .sidebar { flex: 1; background: var(--card); border-left: 1px solid #242629; display: flex; flex-direction: column; min-width: 320px; }
-        .user-list { padding: 10px; display: flex; gap: 8px; overflow-x: auto; border-bottom: 1px solid #242629; }
-        .user-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #000; font-weight: 800; font-size: 11px; flex-shrink: 0; }
-        #chat-box { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .chat-msg { background: #242629; padding: 10px; border-radius: 12px; max-width: 85%; align-self: flex-start; }
-        .chat-msg.me { align-self: flex-end; background: var(--tertiary); color: white; }
-        .chat-input-area { padding: 15px; background: var(--card); border-top: 1px solid #242629; display: flex; gap: 8px; }
-        .btn-vn { background: #22c55e; border-radius: 50%; width: 40px; color: white; border:none; cursor:pointer; }
-        .recording { animation: pulse 1s infinite; background: red !important; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        @media (max-width: 768px) { .app-layout { flex-direction: column; } .video-main { height: 35vh; flex: none; } }
+
+        /* Sidebar & Chat */
+        .sidebar { flex: 1; min-width: 350px; background: var(--card); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 15px; border-bottom: 1px solid #242629; font-weight: 800; color: #fff; display: flex; justify-content: space-between; }
+        
+        /* User List with Indicators */
+        .user-list { padding: 10px 15px; display: flex; gap: 12px; overflow-x: auto; background: rgba(0,0,0,0.2); }
+        .user-item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .user-avatar { width: 45px; height: 45px; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: #000; font-weight: 800; font-size: 16px; position: relative; border: 2px solid transparent; }
+        .status-dot { position: absolute; bottom: -2px; right: -2px; width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--card); }
+        .status-active { background: var(--active); box-shadow: 0 0 8px var(--active); }
+        .status-away { background: var(--away); }
+        .user-name { font-size: 10px; color: var(--paragraph); font-weight: 600; max-width: 50px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+        .chat-msg { background: #242629; padding: 12px 16px; border-radius: 15px; max-width: 85%; align-self: flex-start; line-height: 1.5; position: relative; }
+        .chat-msg.me { align-self: flex-end; background: var(--tertiary); color: white; border-bottom-right-radius: 2px; }
+        .chat-msg b { display: block; font-size: 11px; margin-bottom: 4px; opacity: 0.8; }
+
+        .chat-input-area { padding: 20px; background: var(--card); border-top: 1px solid #242629; display: flex; gap: 10px; align-items: center; }
+        .btn-vn { background: #22c55e; border-radius: 12px; min-width: 45px; height: 45px; color: white; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .recording { animation: pulse 1s infinite; background: #ff4757 !important; }
+        
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        
+        .system-logs { padding: 5px 20px; background: #e5317022; color: var(--tertiary); font-size: 11px; font-weight: bold; border-top: 1px solid #242629; }
+
+        @media (max-width: 900px) { 
+            .app-layout { flex-direction: column; } 
+            .video-main { height: 45vh; flex: none; } 
+            .sidebar { flex: 1; min-width: 100%; }
+        }
     </style>
 </head>
 <body>
-<div id="login" style="position:fixed; inset:0; z-index:9999; background:var(--bg); display:flex; align-items:center; justify-content:center;">
-    <div style="background:var(--card); padding:30px; border-radius:20px; text-align:center; border: 1px solid #333;">
-        <h2 style="color:white">Watch Party</h2>
-        <input type="text" id="my-name" placeholder="Nama kamu...">
-        <button onclick="joinRoom()" class="btn-main" style="width:100%; margin-top:15px;">MASUK</button>
+
+<div id="login" style="position:fixed; inset:0; z-index:9999; background:var(--bg); display:flex; align-items:center; justify-content:center; backdrop-filter: blur(10px);">
+    <div style="background:var(--card); padding:40px; border-radius:25px; text-align:center; border: 1px solid #333; width: 90%; max-width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+        <h1 style="color:white; margin-bottom: 10px;">Watch Party</h1>
+        <p style="margin-bottom: 25px;">Masukkan nama untuk bergabung</p>
+        <input type="text" id="my-name" placeholder="Nama kamu..." style="width: 100%; margin-bottom: 20px; text-align: center;">
+        <button onclick="joinRoom()" class="btn-main" style="width:100%;">MULAI NOBAR</button>
     </div>
 </div>
+
 <div class="app-layout">
     <div class="video-main">
         <div class="nav-bar">
-            <input type="text" id="urlInput" placeholder="Paste link YouTube atau .m3u8 di sini...">
+            <input type="text" id="urlInput" placeholder="Paste link YouTube atau .m3u8 (HLS)...">
             <button class="btn-main" onclick="handlePutar()">PUTAR</button>
         </div>
         <div class="player-container">
             <div id="dplayer"></div>
             <div id="yt-player" class="hidden"></div>
         </div>
-        <div class="system-logs" id="logs">Status: Siap Nobar</div>
+        <div class="system-logs" id="logs">🟢 Server Terhubung</div>
     </div>
+    
     <div class="sidebar">
-        <div class="user-list" id="users"></div>
+        <div class="sidebar-header">
+            <span>PENONTON</span>
+            <span id="user-count" style="color: var(--tertiary);">0</span>
+        </div>
+        <div class="user-list" id="users">
+            </div>
         <div id="chat-box"></div>
         <div class="chat-input-area">
-            <input type="text" id="chatInput" placeholder="Pesan..." onkeypress="if(event.key==='Enter') sendChat()">
             <button class="btn-vn" id="vnBtn" onmousedown="startRecord()" onmouseup="stopRecord()" ontouchstart="startRecord()" ontouchend="stopRecord()">🎤</button>
-            <button class="btn-main" onclick="sendChat()">></button>
+            <input type="text" id="chatInput" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button class="btn-main" onclick="sendChat()" style="padding: 0 15px;">➤</button>
         </div>
     </div>
 </div>
+
 <script>
     const socket = io();
     const logBox = document.getElementById('logs');
     const ytDiv = document.getElementById('yt-player');
+    const userListBox = document.getElementById('users');
     let dp, ytPlayer, isSyncing = false, mediaRecorder, audioChunks = [];
 
-    dp = new DPlayer({ container: document.getElementById('dplayer'), video: { url: '', type: 'hls' }, theme: '#e53170', screenshot: true });
-    function joinRoom() { const n = document.getElementById('my-name').value; if(!n) return; socket.emit('join', n); document.getElementById('login').style.display = 'none'; }
-    socket.on('update-users', list => { document.getElementById('users').innerHTML = list.map(u => `<div class="user-dot" style="background:${u.color}">${u.name[0].toUpperCase()}</div>`).join(''); });
+    // Init DPlayer
+    dp = new DPlayer({
+        container: document.getElementById('dplayer'),
+        video: { url: '', type: 'hls' },
+        theme: '#e53170',
+        screenshot: true,
+        hotkey: true,
+        preload: 'auto'
+    });
 
-    var tag = document.createElement('script'); tag.src = "https://www.youtube.com/iframe_api"; document.body.appendChild(tag);
+    function joinRoom() {
+        const n = document.getElementById('my-name').value;
+        if(!n) return;
+        socket.emit('join', n);
+        document.getElementById('login').style.display = 'none';
+        initPresence();
+    }
+
+    // Deteksi pindah tab
+    function initPresence() {
+        document.addEventListener('visibilitychange', () => {
+            const status = document.visibilityState === 'visible' ? 'active' : 'away';
+            socket.emit('presence-change', status);
+        });
+    }
+
+    socket.on('update-users', list => {
+        document.getElementById('user-count').innerText = list.length;
+        userListBox.innerHTML = list.map(u => `
+            <div class="user-item">
+                <div class="user-avatar" style="background:${u.color}">
+                    ${u.name[0].toUpperCase()}
+                    <div class="status-dot ${u.status === 'active' ? 'status-active' : 'status-away'}"></div>
+                </div>
+                <span class="user-name">${u.name}</span>
+            </div>
+        `).join('');
+    });
+
+    // YouTube Setup
+    var tag = document.createElement('script'); tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
     function onYouTubeIframeAPIReady() {
-        ytPlayer = new YT.Player('yt-player', { videoId: '', events: { 'onStateChange': (e) => {
-            if (isSyncing) return;
-            const time = ytPlayer.getCurrentTime();
-            if (e.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action:'play', time, type:'yt' });
-            if (e.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action:'pause', time, type:'yt' });
-        }}});
+        ytPlayer = new YT.Player('yt-player', {
+            videoId: '',
+            events: { 'onStateChange': (e) => {
+                if (isSyncing) return;
+                const time = ytPlayer.getCurrentTime();
+                if (e.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action:'play', time, type:'yt' });
+                if (e.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action:'pause', time, type:'yt' });
+            }}
+        });
     }
 
     function handlePutar() {
@@ -94,6 +171,7 @@
         const data = { action: 'load', url, type: isYT ? 'yt' : 'raw' };
         applyChange(data);
         socket.emit('video-control', data);
+        logBox.innerText = "🎬 Memutar: " + url.substring(0, 30) + "...";
     }
 
     function applyChange(data) {
@@ -105,14 +183,20 @@
         } else {
             ytDiv.classList.add('hidden');
             if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
-            dp.switchVideo({ url: data.url, type: data.url.includes('m3u8') ? 'hls' : 'normal' });
+            dp.switchVideo({ 
+                url: data.url, 
+                type: data.url.includes('m3u8') ? 'hls' : 'normal' 
+            });
             dp.play();
         }
         setTimeout(() => isSyncing = false, 2000);
     }
 
+    // Sync Control
     dp.on('play', () => { if(!isSyncing) socket.emit('video-control', { action:'play', time: dp.video.currentTime, type:'raw' }); });
     dp.on('pause', () => { if(!isSyncing) socket.emit('video-control', { action:'pause', time: dp.video.currentTime, type:'raw' }); });
+    dp.on('seeked', () => { if(!isSyncing) socket.emit('video-control', { action:'play', time: dp.video.currentTime, type:'raw' }); });
+
     socket.on('video-control', data => {
         if(data.action === 'load') applyChange(data);
         else {
@@ -120,13 +204,21 @@
             if(data.type === 'yt') {
                 if(data.action === 'play'){ ytPlayer.seekTo(data.time); ytPlayer.playVideo(); } else ytPlayer.pauseVideo();
             } else {
-                dp.seek(data.time); if(data.action === 'play') dp.play(); else dp.pause();
+                dp.seek(data.time); 
+                if(data.action === 'play') dp.play(); else dp.pause();
             }
             setTimeout(() => isSyncing = false, 1000);
         }
     });
 
-    function sendChat() { const i = document.getElementById('chatInput'); if(!i.value) return; socket.emit('new-message', { name: document.getElementById('my-name').value, text: i.value, type: 'text' }); addMsg("me", "Kamu", i.value, "text"); i.value = ""; }
+    // Chat Logic
+    function sendChat() {
+        const i = document.getElementById('chatInput'); if(!i.value) return;
+        const name = document.getElementById('my-name').value;
+        socket.emit('new-message', { name, text: i.value, type: 'text' });
+        addMsg("me", "Kamu", i.value, "text"); i.value = "";
+    }
+
     async function startRecord() {
         try {
             const s = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -143,10 +235,12 @@
                 };
             };
             mediaRecorder.start();
-        } catch(e) { console.error("Mic Error", e); }
+        } catch(e) { alert("Izin mic ditolak"); }
     }
     function stopRecord() { if(mediaRecorder) { mediaRecorder.stop(); document.getElementById('vnBtn').classList.remove('recording'); } }
+
     socket.on('chat-receive', d => addMsg("other", d.name, d.text || d.audio, d.type, d.color));
+
     function addMsg(side, name, content, type, color) {
         const box = document.getElementById('chat-box');
         const style = color ? `style="color:${color}"` : "";
