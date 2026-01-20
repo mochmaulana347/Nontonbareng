@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Watch Party</title>
+<title>Watch Party Master</title>
 <script src="/socket.io/socket.io.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/phosphor-icons@1.4.2/src/css/icons.css" rel="stylesheet">
@@ -18,98 +18,22 @@
   --muted:#94a3b8;
 }
 *{box-sizing:border-box}
-body{
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font-family:Inter,sans-serif;
-}
-header{
-  padding:16px 20px;
-  background:linear-gradient(90deg,#22c55e,#38bdf8);
-  font-weight:700;
-  color:#022c22;
-}
-main{
-  display:grid;
-  grid-template-columns:3fr 1fr;
-  height:calc(100vh - 60px);
-}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,sans-serif;}
+header{padding:16px 20px;background:linear-gradient(90deg,#22c55e,#38bdf8);font-weight:700;color:#022c22;}
+main{display:grid;grid-template-columns:3fr 1fr;height:calc(100vh - 60px);}
 .video-area{padding:16px}
-.controls{
-  display:flex;
-  gap:10px;
-  margin-bottom:12px;
-}
-input{
-  flex:1;
-  padding:12px;
-  border-radius:12px;
-  border:none;
-  outline:none;
-}
-button{
-  padding:12px 16px;
-  border:none;
-  border-radius:12px;
-  background:var(--primary);
-  color:#022c22;
-  font-weight:700;
-  cursor:pointer;
-}
-#player-wrap{
-  width:100%;
-  height:100%;
-  background:black;
-  border-radius:16px;
-  overflow:hidden;
-}
-iframe,video{
-  width:100%;
-  height:100%;
-  border:0;
-}
-aside{
-  background:var(--card);
-  padding:16px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.user{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:8px;
-  background:#020617;
-  border-radius:10px;
-  font-size:13px;
-}
+.controls{display:flex;gap:10px;margin-bottom:12px;}
+input{flex:1;padding:12px;border-radius:12px;border:none;outline:none;}
+button{padding:12px 16px;border:none;border-radius:12px;background:var(--primary);color:#022c22;font-weight:700;cursor:pointer;}
+#player-wrap{width:100%;height:100%;background:black;border-radius:16px;overflow:hidden;}
+iframe,video{width:100%;height:100%;border:0;}
+aside{background:var(--card);padding:16px;display:flex;flex-direction:column;gap:10px;}
+.user{display:flex;align-items:center;gap:8px;padding:8px;background:#020617;border-radius:10px;font-size:13px;}
 .green{color:#22c55e}
 .gray{color:#64748b}
-.login{
-  position:fixed;
-  inset:0;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  background:rgba(0,0,0,.85);
-}
-.login-card{
-  background:var(--card);
-  padding:30px;
-  border-radius:20px;
-  width:280px;
-  text-align:center;
-}
-#chat-box{
-  flex:1;
-  overflow-y:auto;
-  background:#0f172a;
-  padding:10px;
-  border-radius:12px;
-  margin-top:10px;
-}
+.login{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;background:rgba(0,0,0,.85);}
+.login-card{background:var(--card);padding:30px;border-radius:20px;width:280px;text-align:center;}
+#chat-box{flex:1;overflow-y:auto;background:#0f172a;padding:10px;border-radius:12px;margin-top:10px;}
 </style>
 </head>
 <body>
@@ -117,8 +41,7 @@ aside{
 <div class="login" id="login">
   <div class="login-card">
     <h2>Watch Party</h2>
-    <input id="nickname" placeholder="Nickname">
-    <br><br>
+    <input id="nickname" placeholder="Nickname"><br><br>
     <button onclick="join()">Join</button>
   </div>
 </div>
@@ -152,6 +75,7 @@ aside{
 <script>
 const socket = io();
 let player = document.getElementById("player");
+let isHost = false;
 
 /* ===== AUTO EMBED ===== */
 function resolveEmbed(url){
@@ -179,12 +103,15 @@ function join(){
 }
 
 /* ===== INTENTS ===== */
-function setVideo(){ socket.emit("intent-set-video", url.value); }
-function play(){ socket.emit("intent-play"); }
-function pause(){ socket.emit("intent-pause"); }
+function setVideo(){ if(isHost) socket.emit("intent-set-video", url.value); }
+function play(){ if(isHost) socket.emit("intent-play"); }
+function pause(){ if(isHost) socket.emit("intent-pause"); }
 
 /* ===== SYNC STATE ===== */
 socket.on("sync", state=>{
+  if(!state.hostId) return;
+  isHost = (socket.id === state.hostId);
+
   if(state.videoUrl){
     const res = resolveEmbed(state.videoUrl);
 
@@ -203,7 +130,7 @@ socket.on("sync", state=>{
     }
   }
 
-  // play/pause untuk iframe (YT/Vimeo) via postMessage
+  // play/pause
   if(player.tagName==="IFRAME"){
     try{
       if(state.playing) player.contentWindow?.postMessage('{"event":"command","func":"playVideo"}',"*");
@@ -212,6 +139,11 @@ socket.on("sync", state=>{
   }else{
     if(state.playing) player.play();
     else player.pause();
+  }
+
+  // seek untuk host
+  if(isHost && player.tagName==="VIDEO"){
+    player.onseeked = ()=> socket.emit("intent-seek", player.currentTime);
   }
 });
 
