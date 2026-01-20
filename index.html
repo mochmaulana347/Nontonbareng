@@ -3,114 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Party Pro</title>
+    <title>Watch Party Universal</title>
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0e17; --headline: #fffffe; --paragraph: #a7a9be; --tertiary: #e53170; --card: #16161a; }
-        body { background: var(--bg); color: var(--paragraph); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .main-layout { display: flex; gap: 20px; max-width: 1300px; width: 100%; height: 85vh; }
+        body { background: var(--bg); color: var(--paragraph); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 20px; }
+        .app-container { display: flex; gap: 20px; max-width: 1400px; margin: auto; height: 85vh; }
         
-        /* Video Section */
-        .video-section { flex: 2.5; background: var(--card); padding: 25px; border-radius: 20px; border: 1px solid #242629; display: flex; flex-direction: column; }
-        .header { display: flex; gap: 10px; margin-bottom: 20px; }
-        input { background: #0f0e17; border: 1px solid #333; padding: 12px; border-radius: 10px; color: white; flex: 1; outline: none; }
-        button { background: var(--tertiary); color: white; border: none; padding: 0 20px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        /* Video Area */
+        .video-area { flex: 3; background: var(--card); padding: 20px; border-radius: 20px; border: 1px solid #242629; display: flex; flex-direction: column; }
+        .input-bar { display: flex; gap: 10px; margin-bottom: 15px; }
+        input { background: #000; border: 1px solid #333; padding: 12px; border-radius: 10px; color: #fff; flex: 1; outline: none; }
+        button { background: var(--tertiary); color: #fff; border: none; padding: 0 20px; border-radius: 10px; cursor: pointer; font-weight: bold; }
 
-        .video-container { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; background: #000; border-radius: 15px; overflow: hidden; }
-        #player { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; }
+        .player-wrapper { flex: 1; background: #000; border-radius: 15px; overflow: hidden; position: relative; }
+        #yt-player, #raw-video { width: 100%; height: 100%; position: absolute; top: 0; left: 0; border: none; }
+        .hidden { display: none !important; }
 
-        /* Chat Section */
-        .chat-section { flex: 1; background: var(--card); padding: 25px; border-radius: 20px; border: 1px solid #242629; display: flex; flex-direction: column; min-width: 300px; }
-        #chat-box { flex: 1; overflow-y: auto; margin-bottom: 15px; }
-        .msg { background: #242629; padding: 10px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; width: fit-content; max-width: 90%; }
-        .msg b { color: var(--tertiary); display: block; font-size: 12px; }
-        h2 { color: var(--headline); margin: 0 0 15px 0; }
+        /* Chat Area */
+        .chat-area { flex: 1; background: var(--card); padding: 20px; border-radius: 20px; border: 1px solid #242629; display: flex; flex-direction: column; }
+        #chat-box { flex: 1; overflow-y: auto; margin-bottom: 15px; font-size: 14px; }
+        .msg { background: #242629; padding: 8px 12px; border-radius: 10px; margin-bottom: 8px; }
     </style>
 </head>
 <body>
 
-<div class="main-layout">
-    <div class="video-section">
-        <h2>🎥 Streaming Room</h2>
-        <div class="header">
-            <input type="text" id="urlInput" placeholder="ID Video YouTube (Contoh: dQw4w9WgXcQ)">
-            <button onclick="changeVideo()">GANTI VIDEO</button>
+<div class="app-container">
+    <div class="video-area">
+        <div class="input-bar">
+            <input type="text" id="videoUrl" placeholder="Tempel link YouTube atau link video (.mp4, .mov, dll)">
+            <button onclick="loadAndSend()">PUTAR</button>
         </div>
-        <div class="video-container">
-            <div id="player"></div>
+        <div class="player-wrapper">
+            <div id="yt-player"></div>
+            <video id="raw-video" class="hidden" controls></video>
         </div>
     </div>
 
-    <div class="chat-section">
-        <h2>💬 Chat</h2>
+    <div class="chat-area">
+        <h3 style="color:white; margin:0 0 15px 0">Chat Room</h3>
         <div id="chat-box"></div>
-        <div style="display:flex; gap:10px;">
-            <input type="text" id="chatInput" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') sendChat()">
-            <button onclick="sendChat()">KIRIM</button>
+        <div style="display:flex; gap:5px">
+            <input type="text" id="msgInput" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button onclick="sendChat()">></button>
         </div>
     </div>
 </div>
 
 <script>
     const socket = io();
-    let player, isSyncing = false;
+    let ytPlayer, isSyncing = false;
+    const rawVideo = document.getElementById('raw-video');
 
-    // Load YouTube API
+    // --- 1. LOGIKA AUTO EMBED & SUMBER ---
+    function extractYTId(url) {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    function switchPlayer(type) {
+        if (type === 'youtube') {
+            document.getElementById('yt-player').classList.remove('hidden');
+            rawVideo.classList.add('hidden');
+            rawVideo.pause();
+        } else {
+            document.getElementById('yt-player').classList.add('hidden');
+            rawVideo.classList.remove('hidden');
+            if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+        }
+    }
+
+    // --- 2. YOUTUBE API ---
     var tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
     document.body.appendChild(tag);
 
     function onYouTubeIframeAPIReady() {
-        player = new YT.Player('player', {
+        ytPlayer = new YT.Player('yt-player', {
             videoId: 'dQw4w9WgXcQ',
-            events: { 'onStateChange': onPlayerStateChange }
+            events: { 'onStateChange': (e) => handleState(e, 'youtube') }
         });
     }
 
-    // Mengirim Perintah ke Server
-    function onPlayerStateChange(event) {
-        if (isSyncing) return; // Jangan kirim sinyal jika sedang di-sinkronkan
-        const time = player.getCurrentTime();
-        if (event.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action: 'play', time });
-        if (event.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action: 'pause', time });
-    }
+    // --- 3. RAW VIDEO EVENT (MP4 dll) ---
+    rawVideo.onplay = () => handleState(null, 'raw', 'play');
+    rawVideo.onpause = () => handleState(null, 'raw', 'pause');
 
-    function changeVideo() {
-        const vid = document.getElementById('urlInput').value;
-        if(!vid) return;
-        socket.emit('video-control', { action: 'change', vid });
-        player.loadVideoById(vid);
-    }
-
-    // Menerima Perintah dari Server
-    socket.on('video-control', (data) => {
-        isSyncing = true; // Kunci agar tidak mengirim balik
-        if (data.action === 'play') {
-            if (Math.abs(player.getCurrentTime() - data.time) > 2) player.seekTo(data.time, true);
-            player.playVideo();
-        }
-        if (data.action === 'pause') player.pauseVideo();
-        if (data.action === 'change') player.loadVideoById(data.vid);
+    // --- 4. LOGIKA SINKRONISASI ---
+    function handleState(event, source, actionManual) {
+        if (isSyncing) return;
         
-        setTimeout(() => isSyncing = false, 1200); // Buka kunci setelah transisi selesai
-    });
-
-    // Fitur Chat
-    function sendChat() {
-        const msg = document.getElementById('chatInput').value;
-        if(!msg) return;
-        socket.emit('new-message', { user: 'Seseorang', text: msg });
-        addMessage("Kamu", msg);
-        document.getElementById('chatInput').value = "";
+        let state = {};
+        if (source === 'youtube') {
+            if (event.data == YT.PlayerState.PLAYING) state = { action: 'play', time: ytPlayer.getCurrentTime(), type: 'youtube' };
+            if (event.data == YT.PlayerState.PAUSED) state = { action: 'pause', time: ytPlayer.getCurrentTime(), type: 'youtube' };
+        } else {
+            state = { action: actionManual, time: rawVideo.currentTime, type: 'raw' };
+        }
+        
+        if (state.action) socket.emit('video-control', state);
     }
 
-    socket.on('chat-receive', (data) => { addMessage(data.user, data.text); });
+    function loadAndSend() {
+        const url = document.getElementById('videoUrl').value;
+        if (!url) return;
+        
+        const ytId = extractYTId(url);
+        const data = ytId ? { action: 'change', vid: ytId, type: 'youtube' } : { action: 'change', vid: url, type: 'raw' };
+        
+        applyVideo(data);
+        socket.emit('video-control', data);
+    }
 
-    function addMessage(user, text) {
-        const box = document.getElementById('chat-box');
-        box.innerHTML += `<div class="msg"><b>${user}</b>${text}</div>`;
-        box.scrollTop = box.scrollHeight;
+    function applyVideo(data) {
+        isSyncing = true;
+        if (data.type === 'youtube') {
+            switchPlayer('youtube');
+            if (data.action === 'change') ytPlayer.loadVideoById(data.vid);
+            if (data.action === 'play') { ytPlayer.seekTo(data.time); ytPlayer.playVideo(); }
+            if (data.action === 'pause') ytPlayer.pauseVideo();
+        } else {
+            switchPlayer('raw');
+            if (data.action === 'change' && rawVideo.src !== data.vid) rawVideo.src = data.vid;
+            if (data.action === 'play') { rawVideo.currentTime = data.time; rawVideo.play(); }
+            if (data.action === 'pause') rawVideo.pause();
+        }
+        setTimeout(() => isSyncing = false, 1000);
+    }
+
+    socket.on('video-control', (data) => applyVideo(data));
+
+    // --- 5. CHAT ---
+    function sendChat() {
+        const input = document.getElementById('msgInput');
+        if(!input.value) return;
+        socket.emit('new-message', { text: input.value });
+        addChat("Kamu", input.value);
+        input.value = "";
+    }
+    socket.on('chat-receive', (d) => addChat("Teman", d.text));
+    function addChat(u, t) {
+        const b = document.getElementById('chat-box');
+        b.innerHTML += `<div class="msg"><b style="color:var(--tertiary)">${u}:</b> ${t}</div>`;
+        b.scrollTop = b.scrollHeight;
     }
 </script>
 </body>
