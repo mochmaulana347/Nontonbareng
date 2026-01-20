@@ -16,7 +16,6 @@ io.on('connection', (socket) => {
         io.emit('update-users', Object.values(users));
     });
 
-    // Cek apakah user pindah tab
     socket.on('presence-change', (status) => {
         if(users[socket.id]) {
             users[socket.id].status = status;
@@ -37,4 +36,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, '0.0.0.0', () => console.log(`Server Ready di Port ${PORT}`));
+http.listen(PORT, '0.0.0.0', () => console.log(`Server Ready`));
