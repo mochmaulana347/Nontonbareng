@@ -3,11 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Watch Party Master</title>
+<title>Watch Party Final</title>
 <script src="/socket.io/socket.io.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/phosphor-icons@1.4.2/src/css/icons.css" rel="stylesheet">
-
 <style>
 :root{
   --bg:#0f172a;
@@ -42,6 +41,7 @@ aside{background:var(--card);padding:16px;display:flex;flex-direction:column;gap
   <div class="login-card">
     <h2>Watch Party</h2>
     <input id="nickname" placeholder="Nickname"><br><br>
+    <label><input type="checkbox" id="hostCheck"> Host</label><br><br>
     <button onclick="join()">Join</button>
   </div>
 </div>
@@ -53,8 +53,8 @@ aside{background:var(--card);padding:16px;display:flex;flex-direction:column;gap
     <div class="controls">
       <input id="url" placeholder="Paste link video apa aja">
       <button onclick="setVideo()">Putar</button>
-      <button id="playBtn">▶</button>
-      <button id="pauseBtn">⏸</button>
+      <button onclick="play()">▶</button>
+      <button onclick="pause()">⏸</button>
     </div>
     <div id="player-wrap">
       <iframe id="player" allow="autoplay"></iframe>
@@ -77,7 +77,6 @@ const socket = io();
 let player = document.getElementById("player");
 let isHost = false;
 
-/* ===== AUTO EMBED ===== */
 function resolveEmbed(url){
   url = url.trim();
   if(url.includes("youtube.com")||url.includes("youtu.be")){
@@ -94,28 +93,25 @@ function resolveEmbed(url){
   return { type:"iframe", src:url };
 }
 
-/* ===== JOIN ===== */
 function join(){
   const n = nickname.value.trim();
   if(!n) return;
-  socket.emit("join", n);
+  isHost = hostCheck.checked;
+  socket.emit("join",{name:n,isHost});
   login.style.display="none";
 }
 
-/* ===== INTENTS ===== */
 function setVideo(){ if(isHost) socket.emit("intent-set-video", url.value); }
 function play(){ if(isHost) socket.emit("intent-play"); }
 function pause(){ if(isHost) socket.emit("intent-pause"); }
 
-/* ===== SYNC STATE ===== */
 socket.on("sync", state=>{
   if(!state.hostId) return;
-  isHost = (socket.id === state.hostId);
+  isHost = (socket.id===state.hostId);
 
   if(state.videoUrl){
     const res = resolveEmbed(state.videoUrl);
-
-    if(res.type === "video"){
+    if(res.type==="video"){
       player.outerHTML = `<video id="player" controls autoplay>
         <source src="${res.src}">
       </video>`;
@@ -130,7 +126,6 @@ socket.on("sync", state=>{
     }
   }
 
-  // play/pause
   if(player.tagName==="IFRAME"){
     try{
       if(state.playing) player.contentWindow?.postMessage('{"event":"command","func":"playVideo"}',"*");
@@ -141,13 +136,11 @@ socket.on("sync", state=>{
     else player.pause();
   }
 
-  // seek untuk host
   if(isHost && player.tagName==="VIDEO"){
     player.onseeked = ()=> socket.emit("intent-seek", player.currentTime);
   }
 });
 
-/* ===== USERS ===== */
 socket.on("users", users=>{
   const box = document.getElementById("users");
   box.innerHTML="";
@@ -157,11 +150,10 @@ socket.on("users", users=>{
   });
 });
 
-/* ===== CHAT ===== */
 socket.on("chat-receive", data=>{
   const b=document.getElementById("chat-box");
   b.innerHTML += `<div style="margin-bottom:4px"><b>${data.user}:</b> ${data.msg}</div>`;
-  b.scrollTop = b.scrollHeight;
+  b.scrollTop=b.scrollHeight;
 });
 
 function sendChat(){
@@ -175,7 +167,6 @@ function sendChat(){
   b.scrollTop=b.scrollHeight;
 }
 
-/* ===== STATUS ===== */
 document.addEventListener("visibilitychange",()=>{
   socket.emit("status",document.hidden?"away":"watching");
 });
