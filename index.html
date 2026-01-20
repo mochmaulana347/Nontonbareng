@@ -20,24 +20,16 @@
         button { border: none; padding: 0 20px; border-radius: 8px; cursor: pointer; font-weight: bold; height: 40px; }
         .btn-main { background: var(--tertiary); color: #fff; }
         .btn-search { background: #3b82f6; color: #fff; }
-        
-        #search-results {
-            position: absolute; top: 65px; left: 15px; right: 15px;
-            background: var(--card); border: 1px solid #333; border-radius: 12px;
-            max-height: 400px; overflow-y: auto; display: none; z-index: 1000;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-        }
+        #search-results { position: absolute; top: 65px; left: 15px; right: 15px; background: var(--card); border: 1px solid #333; border-radius: 12px; max-height: 400px; overflow-y: auto; display: none; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
         .search-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #242629; cursor: pointer; }
         .search-item:hover { background: #242629; }
         .search-item img { width: 40px; height: 55px; border-radius: 4px; margin-right: 15px; object-fit: cover; }
         .search-item b { color: white; font-size: 14px; }
-
         .player-container { flex: 1; position: relative; background: #000; }
         #dplayer { width: 100%; height: 100%; }
         #yt-player { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 50; }
         .hidden { display: none !important; }
         .system-logs { padding: 8px 15px; background: rgba(0,0,0,0.9); font-size: 12px; color: var(--tertiary); font-weight: bold; }
-
         .sidebar { flex: 1; background: var(--card); border-left: 1px solid #242629; display: flex; flex-direction: column; min-width: 320px; }
         .user-list { padding: 10px; display: flex; gap: 8px; overflow-x: auto; border-bottom: 1px solid #242629; }
         .user-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #000; font-weight: 800; font-size: 11px; flex-shrink: 0; }
@@ -45,14 +37,13 @@
         .chat-msg { background: #242629; padding: 10px; border-radius: 12px; max-width: 85%; align-self: flex-start; }
         .chat-msg.me { align-self: flex-end; background: var(--tertiary); color: white; }
         .chat-input-area { padding: 15px; background: var(--card); border-top: 1px solid #242629; display: flex; gap: 8px; }
-        .btn-vn { background: #22c55e; border-radius: 50%; width: 40px; color: white; }
+        .btn-vn { background: #22c55e; border-radius: 50%; width: 40px; color: white; border:none; cursor:pointer; }
         .recording { animation: pulse 1s infinite; background: red !important; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         @media (max-width: 768px) { .app-layout { flex-direction: column; } .video-main { height: 35vh; flex: none; } }
     </style>
 </head>
 <body>
-
 <div id="login" style="position:fixed; inset:0; z-index:9999; background:var(--bg); display:flex; align-items:center; justify-content:center;">
     <div style="background:var(--card); padding:30px; border-radius:20px; text-align:center; border: 1px solid #333;">
         <h2 style="color:white">Watch Party Pro</h2>
@@ -60,7 +51,6 @@
         <button onclick="joinRoom()" class="btn-main" style="width:100%; margin-top:15px;">MASUK</button>
     </div>
 </div>
-
 <div class="app-layout">
     <div class="video-main">
         <div class="nav-bar">
@@ -80,12 +70,11 @@
         <div id="chat-box"></div>
         <div class="chat-input-area">
             <input type="text" id="chatInput" placeholder="Pesan..." onkeypress="if(event.key==='Enter') sendChat()">
-            <button class="btn-vn" id="vnBtn" onmousedown="startRecord()" onmouseup="stopRecord()">🎤</button>
+            <button class="btn-vn" id="vnBtn" onmousedown="startRecord()" onmouseup="stopRecord()" ontouchstart="startRecord()" ontouchend="stopRecord()">🎤</button>
             <button class="btn-main" onclick="sendChat()">></button>
         </div>
     </div>
 </div>
-
 <script>
     const socket = io();
     const logBox = document.getElementById('logs');
@@ -93,53 +82,30 @@
     const resultBox = document.getElementById('search-results');
     let dp, ytPlayer, isSyncing = false, mediaRecorder, audioChunks = [];
 
-    dp = new DPlayer({
-        container: document.getElementById('dplayer'),
-        video: { url: '', type: 'hls' },
-        theme: '#e53170', screenshot: true
-    });
+    dp = new DPlayer({ container: document.getElementById('dplayer'), video: { url: '', type: 'hls' }, theme: '#e53170', screenshot: true });
+    function joinRoom() { const n = document.getElementById('my-name').value; if(!n) return; socket.emit('join', n); document.getElementById('login').style.display = 'none'; }
+    socket.on('update-users', list => { document.getElementById('users').innerHTML = list.map(u => `<div class="user-dot" style="background:${u.color}">${u.name[0].toUpperCase()}</div>`).join(''); });
 
-    function joinRoom() {
-        const n = document.getElementById('my-name').value;
-        if(!n) return;
-        socket.emit('join', n);
-        document.getElementById('login').style.display = 'none';
-    }
-
-    socket.on('update-users', list => {
-        document.getElementById('users').innerHTML = list.map(u => `<div class="user-dot" style="background:${u.color}">${u.name[0].toUpperCase()}</div>`).join('');
-    });
-
-    // YouTube Setup
-    var tag = document.createElement('script');
-    tag.src = "https://www.youtube.com/iframe_api";
-    document.body.appendChild(tag);
+    var tag = document.createElement('script'); tag.src = "https://www.youtube.com/iframe_api"; document.body.appendChild(tag);
     function onYouTubeIframeAPIReady() {
-        ytPlayer = new YT.Player('yt-player', {
-            videoId: '',
-            events: { 'onStateChange': (e) => {
-                if (isSyncing) return;
-                const time = ytPlayer.getCurrentTime();
-                if (e.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action:'play', time, type:'yt' });
-                if (e.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action:'pause', time, type:'yt' });
-            }}
-        });
+        ytPlayer = new YT.Player('yt-player', { videoId: '', events: { 'onStateChange': (e) => {
+            if (isSyncing) return;
+            const time = ytPlayer.getCurrentTime();
+            if (e.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action:'play', time, type:'yt' });
+            if (e.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action:'pause', time, type:'yt' });
+        }}});
     }
 
-    // FITUR SEARCH BARU
     async function searchAPI() {
-        const q = document.getElementById('urlInput').value;
-        if(q.length < 3) return;
-        resultBox.style.display = 'block';
-        resultBox.innerHTML = '<div style="padding:15px;">Mencari...</div>';
+        const q = document.getElementById('urlInput').value; if(q.length < 3) return;
+        resultBox.style.display = 'block'; resultBox.innerHTML = '<div style="padding:15px;">Mencari...</div>';
         try {
             const res = await fetch(`/proxy/search?q=${q}`);
             const json = await res.json();
             const items = json.data || json;
             resultBox.innerHTML = '';
             items.forEach(item => {
-                const el = document.createElement('div');
-                el.className = 'search-item';
+                const el = document.createElement('div'); el.className = 'search-item';
                 el.innerHTML = `<img src="${item.thumb || item.poster || ''}"><b>${item.title}</b>`;
                 el.onclick = () => selectVideo(item.slug || item.id);
                 resultBox.appendChild(el);
@@ -148,92 +114,59 @@
     }
 
     async function selectVideo(slug) {
-        resultBox.style.display = 'none';
-        logBox.innerText = "Status: Mengambil Link...";
+        resultBox.style.display = 'none'; logBox.innerText = "Status: Menarik Link...";
         try {
             const res = await fetch(`/proxy/stream?id=${slug}`);
             const json = await res.json();
-            const url = json.data?.stream_url || json.stream_url || json.url;
-            if(url) executeLoad(url);
+            // Struktur Dramabos: data.stream_url atau data.file atau json.data[0].file
+            let url = (json.data && json.data.stream_url) || (json.data && json.data.file) || json.stream_url || json.url;
+            
+            if(!url && json.data && Array.isArray(json.data)) {
+                url = json.data[0].stream_url || json.data[0].file;
+            }
+
+            if(url) {
+                executeLoad(url);
+                logBox.innerText = "Status: Memutar...";
+            } else {
+                alert("Link video tidak ditemukan di API ini.");
+            }
         } catch(e) { logBox.innerText = "Error mengambil stream"; }
     }
 
-    // FITUR PASTE LAMA
-    function handlePastePutar() {
-        const url = document.getElementById('urlInput').value;
-        if(url) executeLoad(url);
-    }
-
+    function handlePastePutar() { const url = document.getElementById('urlInput').value; if(url) executeLoad(url); }
     function executeLoad(url) {
         const isYT = url.includes('youtube.com') || url.includes('youtu.be');
         const data = { action: 'load', url, type: isYT ? 'yt' : 'raw' };
-        applyChange(data);
-        socket.emit('video-control', data);
+        applyChange(data); socket.emit('video-control', data);
     }
 
     function applyChange(data) {
         isSyncing = true;
-        if (data.type === 'yt') {
-            ytDiv.classList.remove('hidden'); dp.pause();
-            const match = data.url.match(/(?:v=|\/)([0-9A-Za-z_-]{11}).*/);
-            if(match) ytPlayer.loadVideoById(match[1]);
-        } else {
-            ytDiv.classList.add('hidden');
-            if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
-            dp.switchVideo({ url: data.url, type: data.url.includes('m3u8') ? 'hls' : 'normal' });
-            dp.play();
-        }
+        if (data.type === 'yt') { ytDiv.classList.remove('hidden'); dp.pause(); const match = data.url.match(/(?:v=|\/)([0-9A-Za-z_-]{11}).*/); if(match) ytPlayer.loadVideoById(match[1]); }
+        else { ytDiv.classList.add('hidden'); if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo(); dp.switchVideo({ url: data.url, type: data.url.includes('m3u8') ? 'hls' : 'normal' }); dp.play(); }
         setTimeout(() => isSyncing = false, 2000);
     }
 
-    // Sync & Chat
     dp.on('play', () => { if(!isSyncing) socket.emit('video-control', { action:'play', time: dp.video.currentTime, type:'raw' }); });
     dp.on('pause', () => { if(!isSyncing) socket.emit('video-control', { action:'pause', time: dp.video.currentTime, type:'raw' }); });
     socket.on('video-control', data => {
         if(data.action === 'load') applyChange(data);
-        else {
-            isSyncing = true;
-            if(data.type === 'yt') {
-                if(data.action === 'play'){ ytPlayer.seekTo(data.time); ytPlayer.playVideo(); } else ytPlayer.pauseVideo();
-            } else {
-                dp.seek(data.time); if(data.action === 'play') dp.play(); else dp.pause();
-            }
-            setTimeout(() => isSyncing = false, 1000);
-        }
+        else { isSyncing = true; if(data.type === 'yt') { if(data.action === 'play'){ ytPlayer.seekTo(data.time); ytPlayer.playVideo(); } else ytPlayer.pauseVideo(); }
+        else { dp.seek(data.time); if(data.action === 'play') dp.play(); else dp.pause(); }
+        setTimeout(() => isSyncing = false, 1000); }
     });
 
-    function sendChat() {
-        const i = document.getElementById('chatInput'); if(!i.value) return;
-        socket.emit('new-message', { name: document.getElementById('my-name').value, text: i.value, type: 'text' });
-        addMsg("me", "Kamu", i.value, "text"); i.value = "";
-    }
+    function sendChat() { const i = document.getElementById('chatInput'); if(!i.value) return; socket.emit('new-message', { name: document.getElementById('my-name').value, text: i.value, type: 'text' }); addMsg("me", "Kamu", i.value, "text"); i.value = ""; }
     async function startRecord() {
-        try {
-            const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(s);
-            document.getElementById('vnBtn').classList.add('recording');
-            audioChunks = [];
+        try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); mediaRecorder = new MediaRecorder(s); document.getElementById('vnBtn').classList.add('recording'); audioChunks = [];
             mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const b = new Blob(audioChunks, { type: 'audio/ogg' });
-                const r = new FileReader(); r.readAsDataURL(b);
-                r.onloadend = () => {
-                    socket.emit('new-message', { name: document.getElementById('my-name').value, audio: r.result, type: 'audio' });
-                    addMsg("me", "Kamu", r.result, "audio");
-                };
-            };
-            mediaRecorder.start();
-        } catch(e) {}
+            mediaRecorder.onstop = () => { const b = new Blob(audioChunks, { type: 'audio/ogg' }); const r = new FileReader(); r.readAsDataURL(b); r.onloadend = () => { socket.emit('new-message', { name: document.getElementById('my-name').value, audio: r.result, type: 'audio' }); addMsg("me", "Kamu", r.result, "audio"); }; };
+            mediaRecorder.start(); } catch(e) {}
     }
     function stopRecord() { if(mediaRecorder) { mediaRecorder.stop(); document.getElementById('vnBtn').classList.remove('recording'); } }
     socket.on('chat-receive', d => addMsg("other", d.name, d.text || d.audio, d.type, d.color));
-    function addMsg(side, name, content, type, color) {
-        const box = document.getElementById('chat-box');
-        const style = color ? `style="color:${color}"` : "";
-        const html = type === 'text' ? `<span>${content}</span>` : `<audio src="${content}" controls style="width:100%"></audio>`;
-        box.innerHTML += `<div class="chat-msg ${side}"><b ${style}>${name}</b>${html}</div>`;
-        box.scrollTop = box.scrollHeight;
-    }
+    function addMsg(side, name, content, type, color) { const box = document.getElementById('chat-box'); const style = color ? `style="color:${color}"` : ""; const html = type === 'text' ? `<span>${content}</span>` : `<audio src="${content}" controls style="width:100%"></audio>`; box.innerHTML += `<div class="chat-msg ${side}"><b ${style}>${name}</b>${html}</div>`; box.scrollTop = box.scrollHeight; }
     document.addEventListener('click', (e) => { if(!resultBox.contains(e.target) && e.target.id !== 'urlInput') resultBox.style.display = 'none'; });
 </script>
 </body>
