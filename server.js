@@ -27,4 +27,5 @@ io.on('connection', (socket) => {
     });
 });
 
-http.listen(process.env.PORT || 3000, () => console.log("Server Final Ready!"));
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => console.log(`Server Ready di Port ${PORT}`));
