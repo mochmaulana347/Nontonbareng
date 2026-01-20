@@ -1,81 +1,276 @@
-const express = require('express');
-const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="referrer" content="no-referrer" />
+    <title>Watch Party Pro</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #050505; --card: #18181b; --tertiary: #e53170; --active: #00ff88; --text: #ececed; }
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        body, html { background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; height: 100%; width: 100%; overflow: hidden; }
 
-// Folder public agar file index.html bisa diakses
-app.use(express.static(__dirname));
+        .app-layout { position: relative; height: 100vh; width: 100vw; display: flex; flex-direction: column; }
+        .video-section { position: absolute; inset: 0; display: flex; flex-direction: column; background: #000; }
+        
+        .nav-bar { padding: 10px; display: flex; gap: 8px; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); z-index: 1000; position: relative; }
+        .nav-bar input { background: rgba(255,255,255,0.08); border: 1px solid #333; padding: 10px; border-radius: 12px; color: #fff; flex: 1; font-size: 13px; }
+        .btn-putar { background: var(--tertiary); color: #fff; border: none; padding: 0 18px; border-radius: 12px; font-weight: 800; cursor: pointer; }
 
-let users = {};
+        .player-wrapper { flex: 1; position: relative; z-index: 5; background: #000; }
+        #dplayer, #yt-player { width: 100% !important; height: 100% !important; position: absolute !important; top:0; left:0; }
+        .hidden { display: none !important; }
 
-io.on('connection', (socket) => {
+        /* Queue UI */
+        .queue-box { position: absolute; top: 70px; left: 15px; z-index: 900; background: rgba(24,24,27,0.85); border: 1px solid #333; border-radius: 12px; padding: 10px; width: 180px; backdrop-filter: blur(10px); }
+        .queue-title { font-size: 9px; font-weight: 800; color: #666; letter-spacing: 1px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        #queue-list { font-size: 11px; max-height: 100px; overflow-y: auto; }
+        .q-item { padding: 3px 0; border-bottom: 1px solid #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .btn-skip { background: #333; border: none; color: #fff; font-size: 8px; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+
+        .online-status { position: absolute; top: 70px; right: 15px; display: flex; flex-direction: column; gap: 10px; z-index: 900; }
+        .user-dot { width: 38px; height: 38px; border-radius: 12px; background: var(--card); border: 1px solid #444; display: flex; align-items: center; justify-content: center; font-weight: 800; position: relative; font-size: 13px; }
+        .led { width: 10px; height: 10px; border-radius: 50%; position: absolute; top: -3px; right: -3px; border: 2px solid var(--bg); }
+        .led-active { background: var(--active); box-shadow: 0 0 10px var(--active); animation: pulseLed 2s infinite; }
+        @keyframes pulseLed { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
+
+        .chat-bubble-toggle { position: fixed; bottom: 30px; right: 20px; width: 60px; height: 60px; background: var(--tertiary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; cursor: pointer; z-index: 3000; box-shadow: 0 10px 25px rgba(229, 49, 112, 0.4); border: 2px solid rgba(255,255,255,0.1); }
+        .badge { position: absolute; top: -2px; right: -2px; background: #ff4757; color: white; font-size: 10px; min-width: 20px; height: 20px; border-radius: 10px; display: none; align-items: center; justify-content: center; border: 2px solid var(--bg); font-weight: 800; }
+
+        .chat-popup { position: fixed; bottom: 105px; right: 20px; width: 330px; height: 480px; background: var(--card); border-radius: 24px; display: none; flex-direction: column; border: 1px solid #333; z-index: 2999; box-shadow: 0 20px 60px rgba(0,0,0,0.8); overflow: hidden; }
+        .chat-header { padding: 15px; background: #1e1e21; font-weight: 800; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; letter-spacing: 1px; color: #888; }
+        #chat-content { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; background: #0c0c0e; scroll-behavior: smooth; }
+        
+        .msg { background: #1e1e21; padding: 10px 14px; border-radius: 15px; max-width: 85%; align-self: flex-start; font-size: 13px; }
+        .msg.me { align-self: flex-end; background: var(--tertiary); color: #fff; border-bottom-right-radius: 2px; }
+        .msg b { display: block; font-size: 9px; margin-bottom: 3px; opacity: 0.6; text-transform: uppercase; }
+        .log-msg { align-self: center; font-size: 9px; color: #555; background: rgba(255,255,255,0.03); padding: 5px 12px; border-radius: 20px; margin: 4px 0; }
+
+        .input-area { padding: 12px; background: var(--card); border-top: 1px solid #333; display: flex; gap: 10px; }
+        .input-area input { flex: 1; background: #000; border: 1px solid #333; padding: 12px; border-radius: 14px; color: #fff; font-size: 14px; }
+        
+        #btnVn { width: 42px; height: 42px; border-radius: 14px; border: none; cursor: pointer; color: #fff; user-select: none; -webkit-user-select: none; }
+        .recording-pulse { animation: pulseRed 1s infinite; }
+        @keyframes pulseRed { 0% { transform: scale(1); } 50% { transform: scale(1.1); box-shadow: 0 0 15px rgba(255, 71, 87, 0.5); } 100% { transform: scale(1); } }
+
+        .reaksi-quick { position: fixed; bottom: 35px; left: 20px; display: flex; gap: 12px; z-index: 1000; }
+        .reaksi-btn { background: rgba(0,0,0,0.5); border: 1px solid #333; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(10px); font-size: 20px; }
+
+        #reaksi-layer { position: absolute; inset: 0; pointer-events: none; z-index: 800; }
+        .emo-fly { position: absolute; bottom: 20%; font-size: 45px; animation: fly 2s ease-out forwards; }
+        @keyframes fly { 0% { transform: translateY(0) scale(0); opacity: 0; } 30% { opacity: 1; transform: scale(1.2); } 100% { transform: translateY(-350px); opacity: 0; } }
+
+        @media (max-width: 500px) { .chat-popup { width: calc(100% - 30px); height: 60vh; bottom: 100px; right: 15px; } }
+    </style>
+</head>
+<body>
+
+<div id="login" style="position:fixed; inset:0; z-index:10000; background:var(--bg); display:flex; align-items:center; justify-content:center;">
+    <div style="background:var(--card); padding:40px; border-radius:28px; text-align:center; width: 320px; border: 1px solid #333;">
+        <h2 style="margin:0 0 10px; color:#fff; font-weight:800;">Watch Party</h2>
+        <input type="text" id="user-name" placeholder="Nama kamu..." style="width:100%; padding:14px; background:#000; border:1px solid #444; color:#fff; border-radius:15px; text-align:center; margin-bottom:20px;">
+        <button onclick="gabung()" style="width:100%; padding:14px; background:var(--tertiary); color:#fff; border:none; border-radius:15px; font-weight:800; cursor:pointer;">MASUK</button>
+    </div>
+</div>
+
+<div class="video-section">
+    <div class="nav-bar">
+        <input type="text" id="inputUrl" placeholder="Tempel Link Video (+ Queue)...">
+        <button class="btn-putar" onclick="tambahAntrean()">+ QUEUE</button>
+    </div>
+    <div class="player-wrapper">
+        <div id="dplayer"></div>
+        <div id="yt-player" class="hidden"></div>
+        <div class="queue-box">
+            <div class="queue-title">QUEUE <button class="btn-skip" onclick="skipSekarang()">SKIP ⏭️</button></div>
+            <div id="queue-list"></div>
+        </div>
+        <div id="reaksi-layer"></div>
+        <div class="online-status" id="user-list"></div>
+    </div>
+</div>
+
+<div class="reaksi-quick">
+    <div class="reaksi-btn" onclick="sendEmo('🔥')">🔥</div>
+    <div class="reaksi-btn" onclick="sendEmo('😂')">😂</div>
+    <div class="reaksi-btn" onclick="sendEmo('❤️')">❤️</div>
+</div>
+
+<div class="chat-bubble-toggle" onclick="toggleChat()">
+    💬 <div id="chat-badge" class="badge">0</div>
+</div>
+
+<div class="chat-popup" id="chatPopup">
+    <div class="chat-header"><span>ROOM CHAT</span><span onclick="toggleChat()" style="cursor:pointer;">✕</span></div>
+    <div id="chat-content"></div>
+    <div class="input-area">
+        <button id="btnVn" style="background:#22c55e" onclick="handleMicClick()">🎤</button>
+        <input type="text" id="inputChat" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') kirimChat()">
+        <button onclick="kirimChat()" style="background:var(--tertiary); border:none; border-radius:14px; width:42px; color:white;">➤</button>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+    let dp, ytPlayer, isSync = false, unreadCount = 0, isChatOpen = false;
+    let isRecording = false, mediaRecorder, audioChunks = [];
+
+    document.getElementById('user-name').value = localStorage.getItem('wp_name') || '';
+
+    dp = new DPlayer({
+        container: document.getElementById('dplayer'),
+        video: { url: '', type: 'auto' },
+        theme: '#e53170'
+    });
+
+    // Auto-skip saat video selesai
+    dp.on('ended', () => { skipSekarang(); });
+
+    function toggleChat() {
+        isChatOpen = !isChatOpen;
+        document.getElementById('chatPopup').style.display = isChatOpen ? 'flex' : 'none';
+        if(isChatOpen) {
+            unreadCount = 0;
+            document.getElementById('chat-badge').style.display = 'none';
+            const bc = document.getElementById('chat-content');
+            bc.scrollTop = bc.scrollHeight;
+        }
+    }
+
+    function gabung() {
+        const n = document.getElementById('user-name').value;
+        if(!n) return;
+        localStorage.setItem('wp_name', n);
+        socket.emit('join', n);
+        document.getElementById('login').style.display = 'none';
+    }
+
+    // --- QUEUE LOGIC ---
+    function tambahAntrean() {
+        const url = document.getElementById('inputUrl').value;
+        if(!url) return;
+        socket.emit('add-to-queue', url);
+        document.getElementById('inputUrl').value = "";
+    }
+
+    function skipSekarang() {
+        socket.emit('skip-video');
+    }
+
+    socket.on('update-queue', (q) => {
+        const list = document.getElementById('queue-list');
+        list.innerHTML = q.map((url, i) => `<div class="q-item">${i+1}. ${url.split('/').pop()}</div>`).join('');
+    });
+
+    socket.on('play-video', (data) => {
+        isSync = true;
+        const isYt = data.url.includes('youtube.com') || data.url.includes('youtu.be');
+        if(isYt) {
+            document.getElementById('yt-player').classList.remove('hidden'); dp.pause();
+            const id = data.url.match(/(?:v=|\/)([0-9A-Za-z_-]{11}).*/)[1];
+            ytPlayer.loadVideoById(id);
+        } else {
+            document.getElementById('yt-player').classList.add('hidden');
+            if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+            dp.switchVideo({ url: data.url, type: 'auto' });
+            dp.play();
+        }
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); isSync = false; }, 1500);
+    });
+
+    async function handleMicClick() {
+        const btn = document.getElementById('btnVn');
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => {
+                        socket.emit('new-message', { name: document.getElementById('user-name').value, audio: reader.result, type: 'audio' });
+                        renderMsg("me", "Kamu", reader.result, "audio");
+                    };
+                    stream.getTracks().forEach(t => t.stop());
+                };
+                mediaRecorder.start();
+                isRecording = true;
+                btn.style.background = "#ff4757"; btn.innerHTML = "⏹️"; btn.classList.add("recording-pulse");
+            } catch (err) { alert("Mic Error!"); }
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            btn.style.background = "#22c55e"; btn.innerHTML = "🎤"; btn.classList.remove("recording-pulse");
+        }
+    }
+
+    socket.on('update-users', list => {
+        document.getElementById('user-list').innerHTML = list.map(u => `
+            <div class="user-dot" style="border-color: ${u.color}">${u.name[0].toUpperCase()}<div class="led led-active"></div></div>
+        `).join('');
+    });
+
+    socket.on('system-log', text => renderMsg('system', '', text));
+
+    function sendEmo(e) { socket.emit('send-reaction', e); showEmo(e); }
+    socket.on('floating-reaction', e => showEmo(e));
+    function showEmo(e) {
+        const div = document.createElement('div');
+        div.className = 'emo-fly'; div.innerText = e;
+        div.style.left = Math.random() * 70 + 15 + '%';
+        document.getElementById('reaksi-layer').appendChild(div);
+        setTimeout(() => div.remove(), 2000);
+    }
+
+    var tag = document.createElement('script'); tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+    function onYouTubeIframeAPIReady() {
+        ytPlayer = new YT.Player('yt-player', { videoId: '', events: { 'onStateChange': (e) => {
+            if (isSync) return;
+            const t = ytPlayer.getCurrentTime();
+            if (e.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action:'play', time:t, type:'yt' });
+            if (e.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action:'pause', time:t, type:'yt' });
+        }}});
+    }
+
+    dp.on('play', () => { if(!isSync) socket.emit('video-control', { action:'play', time:dp.video.currentTime, type:'raw' }); });
+    dp.on('pause', () => { if(!isSync) socket.emit('video-control', { action:'pause', time:dp.video.currentTime, type:'raw' }); });
+
+    socket.on('video-control', d => {
+        isSync = true;
+        if(d.type==='yt') {
+            if(d.action==='play'){ ytPlayer.seekTo(d.time); ytPlayer.playVideo(); } else ytPlayer.pauseVideo();
+        } else {
+            dp.seek(d.time); if(d.action==='play') dp.play(); else dp.pause();
+        }
+        setTimeout(() => isSync = false, 1000);
+    });
+
+    function kirimChat() {
+        const i = document.getElementById('inputChat'); if(!i.value) return;
+        socket.emit('new-message', { name: document.getElementById('user-name').value, text: i.value, type: 'text' });
+        renderMsg("me", "Kamu", i.value, "text"); i.value = "";
+    }
+
+    socket.on('chat-receive', d => renderMsg("other", d.name, d.text || d.audio, d.type, d.color));
     
-    // 1. Logika saat user bergabung
-    socket.on('join', (name) => {
-        // Simpan data user
-        users[socket.id] = { 
-            name, 
-            color: '#' + Math.floor(Math.random()*16777215).toString(16),
-            status: 'active' 
-        };
-        
-        // Update daftar orang online ke semua user
-        io.emit('update-users', Object.values(users));
-        
-        // KIRIM LOG: Memberitahu semua orang ada yang masuk
-        io.emit('system-log', `${name} bergabung ke pesta 🟢`);
-    });
-
-    // 2. Logika Presence (Deteksi fokus tab: LED Hijau/Abu-abu)
-    socket.on('presence-change', (status) => {
-        if(users[socket.id]) {
-            users[socket.id].status = status;
-            io.emit('update-users', Object.values(users));
+    function renderMsg(side, name, cont, type, color) {
+        const box = document.getElementById('chat-content');
+        if(side === 'system') box.innerHTML += `<div class="log-msg">${cont}</div>`;
+        else {
+            const style = color ? `style="color:${color}"` : "";
+            const html = type === 'text' ? `<span>${cont}</span>` : `<audio src="${cont}" controls style="width:100%; filter:invert(1)"></audio>`;
+            box.innerHTML += `<div class="msg ${side}"><b ${style}>${name}</b>${html}</div>`;
         }
-    });
-
-    // 3. Logika Sinkronisasi Video (Play, Pause, Load)
-    socket.on('video-control', (data) => {
-        // Mengirim perintah ke semua orang kecuali pengirim
-        socket.broadcast.emit('video-control', data);
-    });
-
-    // 4. Logika Chat & Voice Note
-    socket.on('new-message', (data) => {
-        const user = users[socket.id];
-        if (user) {
-            socket.broadcast.emit('chat-receive', { 
-                ...data, 
-                color: user.color 
-            });
-        }
-    });
-
-    // 5. Logika Live Reaction (Emoji Terbang)
-    socket.on('send-reaction', (emoji) => {
-        io.emit('floating-reaction', emoji);
-    });
-
-    // 6. Logika saat user keluar (Disconnect)
-    socket.on('disconnect', () => {
-        if (users[socket.id]) {
-            const name = users[socket.id].name;
-            delete users[socket.id];
-            
-            // Update daftar online
-            io.emit('update-users', Object.values(users));
-            
-            // KIRIM LOG: Memberitahu semua orang ada yang keluar
-            io.emit('system-log', `${name} meninggalkan pesta 🔴`);
-        }
-    });
-});
-
-// Jalankan Server
-const PORT = process.env.PORT || 3000;
-http.listen(PORT, '0.0.0.0', () => {
-    console.log(`====================================`);
-    console.log(`SERVER WATCH PARTY READY!`);
-    console.log(`Running on port: ${PORT}`);
-    console.log(`====================================`);
-});
+        box.scrollTop = box.scrollHeight;
+    }
+</script>
+</body>
+</html>
