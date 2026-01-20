@@ -1,79 +1,21 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-
+const express = require('express');
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
 
 app.use(express.static(__dirname));
 
-const state = {
-  videoUrl: "",
-  playing: false,
-  time: 0,
-  hostId: null,
-  users: {}
-};
+io.on('connection', (socket) => {
+    // Meneruskan perintah video (play, pause, ganti video)
+    socket.on('video-control', (data) => {
+        socket.broadcast.emit('video-control', data);
+    });
 
-setInterval(()=>{
-  if(state.hostId){
-    io.emit("sync", state);
-  }
-}, 500);
-
-io.on("connection", socket => {
-
-  socket.on("join", ({name,isHost})=>{
-    state.users[socket.id] = { name, status:"watching" };
-
-    if(isHost) state.hostId = socket.id;
-    else if(!state.hostId) state.hostId = socket.id; // fallback host
-
-    socket.emit("sync", state);
-    io.emit("users", state.users);
-  });
-
-  socket.on("intent-set-video", url=>{
-    if(socket.id!==state.hostId) return;
-    state.videoUrl = url;
-    state.time = 0;
-    state.playing = false;
-  });
-
-  socket.on("intent-play", ()=>{
-    if(socket.id!==state.hostId) return;
-    state.playing = true;
-  });
-
-  socket.on("intent-pause", ()=>{
-    if(socket.id!==state.hostId) return;
-    state.playing = false;
-  });
-
-  socket.on("intent-seek", time=>{
-    if(socket.id!==state.hostId) return;
-    state.time = time;
-  });
-
-  socket.on("status", status=>{
-    if(state.users[socket.id]){
-      state.users[socket.id].status = status;
-      io.emit("users", state.users);
-    }
-  });
-
-  socket.on("new-message", data=>{
-    io.emit("chat-receive", data);
-  });
-
-  socket.on("disconnect", ()=>{
-    if(socket.id===state.hostId) state.hostId = Object.keys(state.users)[0]||null;
-    delete state.users[socket.id];
-    io.emit("users", state.users);
-  });
-
+    // Meneruskan pesan chat
+    socket.on('new-message', (data) => {
+        socket.broadcast.emit('chat-receive', data);
+    });
 });
 
-const PORT = process.env.PORT||3000;
-server.listen(PORT, ()=>console.log("WatchParty final ready on port",PORT));
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => console.log(`Server aktif di port ${PORT}`));
