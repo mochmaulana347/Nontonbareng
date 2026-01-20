@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer" />
-    <title>Watch Party Pro - Universal</title>
+    <title>Watch Party Fix</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
@@ -31,7 +31,7 @@
     <div class="video-section">
         <div class="nav">
             <input type="text" id="urlInput" placeholder="Paste link YouTube atau .m3u8">
-            <button onclick="loadVideo()">PUTAR</button>
+            <button id="btnPutar">PUTAR</button>
         </div>
         <div class="player-wrapper">
             <div id="yt-player"></div>
@@ -42,8 +42,8 @@
         <h3 style="color:white; margin:0 0 15px 0">Chat Room</h3>
         <div id="chat-box"></div>
         <div style="display:flex; gap:5px">
-            <input type="text" id="chatInput" placeholder="Pesan..." onkeypress="if(event.key==='Enter') sendChat()">
-            <button onclick="sendChat()">></button>
+            <input type="text" id="chatInput" placeholder="Pesan...">
+            <button id="btnChat">></button>
         </div>
     </div>
 </div>
@@ -52,7 +52,7 @@
     const socket = io();
     let ytPlayer, art, isSyncing = false;
 
-    // 1. Inisialisasi ArtPlayer (Untuk m3u8/MP4)
+    // 1. Inisialisasi ArtPlayer
     art = new ArtPlayer({
         container: '#art-container',
         url: '',
@@ -66,42 +66,32 @@
                 }
             },
         },
-        autoSize: true, fullscreen: true, setting: true,
+        autoSize: true, fullscreen: true,
     });
 
-    // Event Listener ArtPlayer
     art.on('play', () => { if(!isSyncing) socket.emit('video-control', {action:'play', time: art.currentTime, type:'raw'}); });
     art.on('pause', () => { if(!isSyncing) socket.emit('video-control', {action:'pause', time: art.currentTime, type:'raw'}); });
-    art.on('seek', (time) => { if(!isSyncing) socket.emit('video-control', {action:'play', time: time, type:'raw'}); });
 
     // 2. YouTube API
     var tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
     document.body.appendChild(tag);
+    
     function onYouTubeIframeAPIReady() {
         ytPlayer = new YT.Player('yt-player', {
             videoId: 'dQw4w9WgXcQ',
-            events: { 'onStateChange': (e) => {
-                if (isSyncing) return;
-                const time = ytPlayer.getCurrentTime();
-                if (e.data == YT.PlayerState.PLAYING) socket.emit('video-control', {action:'play', time, type:'youtube'});
-                if (e.data == YT.PlayerState.PAUSED) socket.emit('video-control', {action:'pause', time, type:'youtube'});
-            }}
+            events: {
+                'onStateChange': (e) => {
+                    if (isSyncing) return;
+                    const time = ytPlayer.getCurrentTime();
+                    if (e.data == YT.PlayerState.PLAYING) socket.emit('video-control', {action:'play', time, type:'youtube'});
+                    if (e.data == YT.PlayerState.PAUSED) socket.emit('video-control', {action:'pause', time, type:'youtube'});
+                }
+            }
         });
     }
 
-    // 3. Logika Utama
-    function loadVideo() {
-        const url = document.getElementById('urlInput').value;
-        if (!url) return;
-        const ytId = url.match(/(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*)/);
-        const data = (ytId && ytId[2].length === 11) ? 
-            { action: 'change', vid: ytId[2], type: 'youtube' } : 
-            { action: 'change', vid: url, type: 'raw' };
-        apply(data);
-        socket.emit('video-control', data);
-    }
-
+    // 3. Fungsi Sinkron Utama
     function apply(data) {
         isSyncing = true;
         if (data.type === 'youtube') {
@@ -114,7 +104,7 @@
         } else {
             document.getElementById('yt-player').classList.add('hidden');
             document.getElementById('art-container').classList.remove('hidden');
-            if(ytPlayer) ytPlayer.pauseVideo();
+            if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
             if (data.action === 'change') art.switchUrl(data.vid);
             if (data.action === 'play') { art.currentTime = data.time; art.play(); }
             if (data.action === 'pause') art.pause();
@@ -122,9 +112,28 @@
         setTimeout(() => isSyncing = false, 1500);
     }
 
+    // 4. Event Handler Tombol
+    document.getElementById('btnPutar').addEventListener('click', () => {
+        const url = document.getElementById('urlInput').value;
+        if (!url) return;
+        
+        let data;
+        const ytIdMatch = url.match(/(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*)/);
+        
+        if (ytIdMatch && ytIdMatch[2].length === 11) {
+            data = { action: 'change', vid: ytIdMatch[2], type: 'youtube' };
+        } else {
+            data = { action: 'change', vid: url, type: 'raw' };
+        }
+
+        apply(data);
+        socket.emit('video-control', data);
+    });
+
     socket.on('video-control', (data) => apply(data));
 
-    // 4. Chat
+    // Chat
+    document.getElementById('btnChat').addEventListener('click', sendChat);
     function sendChat() {
         const inp = document.getElementById('chatInput');
         if(!inp.value) return;
@@ -134,7 +143,7 @@
     socket.on('chat-receive', (d) => addMsg("Rekan", d.text));
     function addMsg(u, t) {
         const b = document.getElementById('chat-box');
-        b.innerHTML += `<div class="msg"><b style="color:var(--tertiary)">${u}:</b> ${t}</div>`;
+        b.innerHTML += `<div class="msg"><b>${u}:</b> ${t}</div>`;
         b.scrollTop = b.scrollHeight;
     }
 </script>
