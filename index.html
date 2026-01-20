@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer" />
     <title>Watch Party Pro - Universal</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0e17; --headline: #fffffe; --paragraph: #a7a9be; --tertiary: #e53170; --card: #16161a; }
@@ -16,7 +18,7 @@
         input { background: #000; border: 1px solid #333; padding: 12px; border-radius: 10px; color: #fff; flex: 1; outline: none; }
         button { background: var(--tertiary); color: #fff; border: none; padding: 0 20px; border-radius: 10px; cursor: pointer; font-weight: bold; }
         .player-wrapper { flex: 1; background: #000; border-radius: 15px; overflow: hidden; position: relative; }
-        #yt-player, #raw-video { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        #yt-player, #art-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
         .hidden { display: none !important; }
         .chat-section { flex: 1; background: var(--card); padding: 20px; border-radius: 20px; border: 1px solid #242629; display: flex; flex-direction: column; min-width: 300px; }
         #chat-box { flex: 1; overflow-y: auto; margin-bottom: 15px; }
@@ -28,12 +30,12 @@
 <div class="app-container">
     <div class="video-section">
         <div class="nav">
-            <input type="text" id="urlInput" placeholder="Paste link YouTube atau link .m3u8 / .mp4">
+            <input type="text" id="urlInput" placeholder="Paste link YouTube atau .m3u8">
             <button onclick="loadVideo()">PUTAR</button>
         </div>
         <div class="player-wrapper">
             <div id="yt-player"></div>
-            <video id="raw-video" class="hidden" controls></video>
+            <div id="art-container" class="hidden"></div>
         </div>
     </div>
     <div class="chat-section">
@@ -48,47 +50,54 @@
 
 <script>
     const socket = io();
-    let ytPlayer, hls, isSyncing = false;
-    const rawVideo = document.getElementById('raw-video');
+    let ytPlayer, art, isSyncing = false;
 
-    // 1. YouTube API Load
+    // 1. Inisialisasi ArtPlayer (Untuk m3u8/MP4)
+    art = new ArtPlayer({
+        container: '#art-container',
+        url: '',
+        type: 'm3u8',
+        customType: {
+            m3u8: function(video, url) {
+                if (Hls.isSupported()) {
+                    const hls = new Hls();
+                    hls.loadSource(url);
+                    hls.attachMedia(video);
+                }
+            },
+        },
+        autoSize: true, fullscreen: true, setting: true,
+    });
+
+    // Event Listener ArtPlayer
+    art.on('play', () => { if(!isSyncing) socket.emit('video-control', {action:'play', time: art.currentTime, type:'raw'}); });
+    art.on('pause', () => { if(!isSyncing) socket.emit('video-control', {action:'pause', time: art.currentTime, type:'raw'}); });
+    art.on('seek', (time) => { if(!isSyncing) socket.emit('video-control', {action:'play', time: time, type:'raw'}); });
+
+    // 2. YouTube API
     var tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
     document.body.appendChild(tag);
-
     function onYouTubeIframeAPIReady() {
         ytPlayer = new YT.Player('yt-player', {
             videoId: 'dQw4w9WgXcQ',
-            events: { 'onStateChange': (e) => handleState(e, 'youtube') }
+            events: { 'onStateChange': (e) => {
+                if (isSyncing) return;
+                const time = ytPlayer.getCurrentTime();
+                if (e.data == YT.PlayerState.PLAYING) socket.emit('video-control', {action:'play', time, type:'youtube'});
+                if (e.data == YT.PlayerState.PAUSED) socket.emit('video-control', {action:'pause', time, type:'youtube'});
+            }}
         });
     }
 
-    // 2. Logic Sinkronisasi
-    function handleState(event, source, actionManual) {
-        if (isSyncing) return;
-        let data = {};
-        if (source === 'youtube') {
-            if (event.data == YT.PlayerState.PLAYING) data = { action: 'play', time: ytPlayer.getCurrentTime(), type: 'youtube' };
-            if (event.data == YT.PlayerState.PAUSED) data = { action: 'pause', time: ytPlayer.getCurrentTime(), type: 'youtube' };
-        } else {
-            data = { action: actionManual, time: rawVideo.currentTime, type: 'raw' };
-        }
-        if (data.action) socket.emit('video-control', data);
-    }
-
-    rawVideo.onplay = () => handleState(null, 'raw', 'play');
-    rawVideo.onpause = () => handleState(null, 'raw', 'pause');
-
-    // 3. Load & Switch Player
+    // 3. Logika Utama
     function loadVideo() {
         const url = document.getElementById('urlInput').value;
         if (!url) return;
-        
         const ytId = url.match(/(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*)/);
         const data = (ytId && ytId[2].length === 11) ? 
             { action: 'change', vid: ytId[2], type: 'youtube' } : 
             { action: 'change', vid: url, type: 'raw' };
-
         apply(data);
         socket.emit('video-control', data);
     }
@@ -97,30 +106,25 @@
         isSyncing = true;
         if (data.type === 'youtube') {
             document.getElementById('yt-player').classList.remove('hidden');
-            rawVideo.classList.add('hidden'); rawVideo.pause();
+            document.getElementById('art-container').classList.add('hidden');
+            art.pause();
             if (data.action === 'change') ytPlayer.loadVideoById(data.vid);
             if (data.action === 'play') { ytPlayer.seekTo(data.time); ytPlayer.playVideo(); }
             if (data.action === 'pause') ytPlayer.pauseVideo();
         } else {
             document.getElementById('yt-player').classList.add('hidden');
-            rawVideo.classList.remove('hidden'); if(ytPlayer) ytPlayer.pauseVideo();
-            if (data.action === 'change') {
-                if (data.vid.includes('.m3u8')) {
-                    if (Hls.isSupported()) { 
-                        if(hls) hls.destroy(); hls = new Hls(); 
-                        hls.loadSource(data.vid); hls.attachMedia(rawVideo); 
-                    }
-                } else { rawVideo.src = data.vid; }
-            }
-            if (data.action === 'play') { rawVideo.currentTime = data.time; rawVideo.play(); }
-            if (data.action === 'pause') rawVideo.pause();
+            document.getElementById('art-container').classList.remove('hidden');
+            if(ytPlayer) ytPlayer.pauseVideo();
+            if (data.action === 'change') art.switchUrl(data.vid);
+            if (data.action === 'play') { art.currentTime = data.time; art.play(); }
+            if (data.action === 'pause') art.pause();
         }
         setTimeout(() => isSyncing = false, 1500);
     }
 
     socket.on('video-control', (data) => apply(data));
 
-    // 4. Chat Sederhana
+    // 4. Chat
     function sendChat() {
         const inp = document.getElementById('chatInput');
         if(!inp.value) return;
