@@ -26,7 +26,8 @@ io.on('connection', (socket) => {
     socket.on('video-control', (data) => { socket.broadcast.emit('video-control', data); });
     
     socket.on('new-message', (data) => {
-        socket.broadcast.emit('chat-receive', { ...data, color: users[socket.id]?.color });
+        const user = users[socket.id];
+        socket.broadcast.emit('chat-receive', { ...data, color: user ? user.color : '#e53170' });
     });
 
     socket.on('disconnect', () => { 
