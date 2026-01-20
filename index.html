@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer" />
-    <title>Watch Party Pro - DPlayer Edition</title>
+    <title>Watch Party Pro - API & DPlayer</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
@@ -13,41 +13,28 @@
         :root { --bg: #0f0e17; --headline: #fffffe; --paragraph: #a7a9be; --tertiary: #e53170; --card: #16161a; }
         * { box-sizing: border-box; }
         body { background: var(--bg); color: var(--paragraph); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; overflow: hidden; height: 100vh; }
-        
         .app-layout { display: flex; height: 100vh; }
-        
-        /* Video Area */
         .video-main { flex: 3; display: flex; flex-direction: column; background: #000; position: relative; }
         .nav-bar { padding: 15px; display: flex; gap: 10px; background: var(--card); border-bottom: 1px solid #242629; z-index: 100; }
         input { background: #000; border: 1px solid #333; padding: 10px; border-radius: 8px; color: #fff; flex: 1; outline: none; }
         button { background: var(--tertiary); color: #fff; border: none; padding: 0 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        
-        .player-container { flex: 1; position: relative; background: #000; }
+        .player-container { flex: 1; position: relative; background: #000; overflow: hidden; }
         #dplayer { width: 100%; height: 100%; }
         #yt-player { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 50; }
-        .hidden { display: none !important; }
+        .hidden { display: none !important; visibility: hidden; }
         .system-logs { padding: 8px 15px; background: rgba(0,0,0,0.9); font-size: 12px; color: var(--tertiary); font-weight: bold; z-index: 60; }
-
-        /* Sidebar Area */
         .sidebar { flex: 1; background: var(--card); border-left: 1px solid #242629; display: flex; flex-direction: column; min-width: 320px; }
         .user-list { padding: 10px; display: flex; gap: 8px; overflow-x: auto; border-bottom: 1px solid #242629; }
         .user-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #000; font-weight: 800; font-size: 11px; flex-shrink: 0; }
-        
         #chat-box { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
         .chat-msg { background: #242629; padding: 10px; border-radius: 12px; max-width: 85%; align-self: flex-start; word-wrap: break-word; }
         .chat-msg.me { align-self: flex-end; background: var(--tertiary); color: white; }
         .chat-msg b { display: block; font-size: 10px; margin-bottom: 4px; opacity: 0.8; }
-        
-        .chat-input-area { padding: 15px; background: var(--card); border-top: 1px solid #242629; display: flex; gap: 8px; align-items: center; }
+        .chat-input-area { padding: 15px; background: var(--card); border-top: 1px solid #242629; display: flex; gap: 8px; }
         .btn-vn { background: #22c55e; border-radius: 50%; width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; border:none; cursor:pointer; }
         .recording { animation: pulse 1s infinite; background: red !important; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-
-        @media (max-width: 768px) {
-            .app-layout { flex-direction: column; }
-            .sidebar { min-width: 100%; flex: 1; }
-            .video-main { height: 35vh; flex: none; }
-        }
+        @media (max-width: 768px) { .app-layout { flex-direction: column; } .sidebar { min-width: 100%; flex: 1; } .video-main { height: 35vh; flex: none; } }
     </style>
 </head>
 <body>
@@ -63,21 +50,20 @@
 <div class="app-layout">
     <div class="video-main">
         <div class="nav-bar">
-            <input type="text" id="urlInput" placeholder="Paste link video atau YouTube">
+            <input type="text" id="urlInput" placeholder="Paste link YouTube, m3u8, atau API Video">
             <button onclick="handlePutar()">PUTAR</button>
         </div>
         <div class="player-container">
             <div id="dplayer"></div>
             <div id="yt-player" class="hidden"></div>
         </div>
-        <div class="system-logs" id="logs">Status: Menunggu link...</div>
+        <div class="system-logs" id="logs">Status: Siap Nobar</div>
     </div>
-    
     <div class="sidebar">
         <div class="user-list" id="users"></div>
         <div id="chat-box"></div>
         <div class="chat-input-area">
-            <input type="text" id="chatInput" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') sendChat()">
+            <input type="text" id="chatInput" placeholder="Pesan..." onkeypress="if(event.key==='Enter') sendChat()">
             <button class="btn-vn" id="vnBtn" onmousedown="startRecord()" onmouseup="stopRecord()" ontouchstart="startRecord()" ontouchend="stopRecord()">🎤</button>
             <button onclick="sendChat()">></button>
         </div>
@@ -90,13 +76,12 @@
     const ytDiv = document.getElementById('yt-player');
     let dp, ytPlayer, isSyncing = false, mediaRecorder, audioChunks = [];
 
-    // 1. Inisialisasi DPlayer
+    // Init DPlayer
     dp = new DPlayer({
         container: document.getElementById('dplayer'),
         video: { url: '', type: 'hls' },
-        preload: 'auto',
-        screenshot: true,
-        theme: '#e53170'
+        theme: '#e53170',
+        screenshot: true
     });
 
     function joinRoom() {
@@ -110,7 +95,7 @@
         document.getElementById('users').innerHTML = list.map(u => `<div class="user-dot" style="background:${u.color}">${u.name[0].toUpperCase()}</div>`).join('');
     });
 
-    // 2. YouTube Setup
+    // YouTube API
     var tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
     document.body.appendChild(tag);
@@ -127,10 +112,21 @@
         });
     }
 
-    // 3. Main Logic
-    function handlePutar() {
-        const url = document.getElementById('urlInput').value;
+    async function handlePutar() {
+        let url = document.getElementById('urlInput').value;
         if (!url) return;
+        logBox.innerText = "Status: Memproses Link...";
+
+        // Logic API Check (Jika link mengandung stream/api)
+        if (url.includes('/stream/') || url.includes('api')) {
+            try {
+                const res = await fetch(url);
+                const result = await res.json();
+                url = result.url || (result.data && result.data.url) || url;
+                logBox.innerText = "Status: Link API Berhasil Diterima";
+            } catch(e) { logBox.innerText = "Status: Memutar Direct (API Fetch Skip)"; }
+        }
+
         const isYT = url.includes('youtube.com') || url.includes('youtu.be');
         const data = { action: 'load', url, type: isYT ? 'yt' : 'raw' };
         applyChange(data);
@@ -139,28 +135,25 @@
 
     function applyChange(data) {
         isSyncing = true;
-        logBox.innerText = "Status: Memuat Player...";
-        
         if (data.type === 'yt') {
-            ytDiv.classList.remove('hidden');
-            dp.pause();
+            ytDiv.classList.remove('hidden'); dp.pause();
             const match = data.url.match(/(?:v=|\/)([0-9A-Za-z_-]{11}).*/);
             if(match) ytPlayer.loadVideoById(match[1]);
-            logBox.innerText = "Status: Mode YouTube";
+            logBox.innerText = "Status: Memutar YouTube";
         } else {
             ytDiv.classList.add('hidden');
             if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
             dp.switchVideo({ 
                 url: data.url, 
-                type: data.url.includes('m3u8') ? 'hls' : 'normal' 
+                type: (data.url.includes('m3u8')) ? 'hls' : 'normal' 
             });
             dp.play();
-            logBox.innerText = "Status: Mode DPlayer (HLS/Direct)";
+            logBox.innerText = "Status: Memutar DPlayer";
         }
         setTimeout(() => isSyncing = false, 2000);
     }
 
-    // DPlayer Events
+    // DPlayer Controls
     dp.on('play', () => { if(!isSyncing) socket.emit('video-control', { action:'play', time: dp.video.currentTime, type:'raw' }); });
     dp.on('pause', () => { if(!isSyncing) socket.emit('video-control', { action:'pause', time: dp.video.currentTime, type:'raw' }); });
     dp.on('seek', () => { if(!isSyncing) socket.emit('video-control', { action:'play', time: dp.video.currentTime, type:'raw' }); });
@@ -179,7 +172,7 @@
         }
     });
 
-    // 4. Chat & Voice Note
+    // Chat & VN
     function sendChat() {
         const i = document.getElementById('chatInput');
         if(!i.value) return;
@@ -205,7 +198,7 @@
                 };
             };
             mediaRecorder.start();
-        } catch(e) { console.log("Mic blocked"); }
+        } catch(e) { console.log("Mic error"); }
     }
 
     function stopRecord() { if(mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); document.getElementById('vnBtn').classList.remove('recording'); } }
