@@ -2,46 +2,32 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const axios = require('axios');
-const cors = require('cors');
 
-app.use(cors());
 app.use(express.static(__dirname));
 
 let users = {};
 
-// Proxy Search
-app.get('/proxy/search', async (req, res) => {
-    try {
-        const q = req.query.q;
-        const response = await axios.get(`https://dramabos.asia/api/tensei/search?q=${encodeURIComponent(q)}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-        res.json(response.data);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Proxy Stream - Diperkuat untuk mengambil link video
-app.get('/proxy/stream', async (req, res) => {
-    try {
-        const id = req.query.id;
-        const response = await axios.get(`https://dramabos.asia/api/tensei/stream/${id}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-        res.json(response.data);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 io.on('connection', (socket) => {
     socket.on('join', (name) => {
-        users[socket.id] = { name, color: '#' + Math.floor(Math.random()*16777215).toString(16) };
+        users[socket.id] = { 
+            name, 
+            color: '#' + Math.floor(Math.random()*16777215).toString(16) 
+        };
         io.emit('update-users', Object.values(users));
     });
-    socket.on('video-control', (data) => { socket.broadcast.emit('video-control', data); });
+
+    socket.on('video-control', (data) => {
+        socket.broadcast.emit('video-control', data);
+    });
+
     socket.on('new-message', (data) => {
         const user = users[socket.id];
-        socket.broadcast.emit('chat-receive', { ...data, color: user ? user.color : '#e53170' });
+        socket.broadcast.emit('chat-receive', { 
+            ...data, 
+            color: user ? user.color : '#e53170' 
+        });
     });
+
     socket.on('disconnect', () => {
         delete users[socket.id];
         io.emit('update-users', Object.values(users));
@@ -49,4 +35,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, '0.0.0.0', () => console.log(`Server Ready on port ${PORT}`));
+http.listen(PORT, '0.0.0.0', () => console.log(`Server jalan di port ${PORT}`));
