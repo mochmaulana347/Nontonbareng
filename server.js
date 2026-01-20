@@ -13,10 +13,9 @@ const state = {
   playing: false,
   time: 0,
   hostId: null,
-  users: {} // socket.id -> {name, status}
+  users: {}
 };
 
-// Sync interval (server authoritative)
 setInterval(()=>{
   if(state.hostId){
     io.emit("sync", state);
@@ -25,15 +24,18 @@ setInterval(()=>{
 
 io.on("connection", socket => {
 
-  socket.on("join", name=>{
+  socket.on("join", ({name,isHost})=>{
     state.users[socket.id] = { name, status:"watching" };
-    if(!state.hostId) state.hostId = socket.id; // user pertama jadi host
+
+    if(isHost) state.hostId = socket.id;
+    else if(!state.hostId) state.hostId = socket.id; // fallback host
+
     socket.emit("sync", state);
     io.emit("users", state.users);
   });
 
   socket.on("intent-set-video", url=>{
-    if(socket.id!==state.hostId) return; // cuma host
+    if(socket.id!==state.hostId) return;
     state.videoUrl = url;
     state.time = 0;
     state.playing = false;
@@ -74,4 +76,4 @@ io.on("connection", socket => {
 });
 
 const PORT = process.env.PORT||3000;
-server.listen(PORT, ()=>console.log("WatchParty host ready on port",PORT));
+server.listen(PORT, ()=>console.log("WatchParty final ready on port",PORT));
