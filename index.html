@@ -10,77 +10,88 @@
     <script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #050505; --card: #121214; --tertiary: #e53170; --active: #00ff88; --away: #3e3e42; }
-        * { box-sizing: border-box; outline: none; }
-        body, html { background: var(--bg); color: #e1e1e6; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; height: 100vh; overflow: hidden; }
+        :root { --bg: #0a0a0c; --card: #16161a; --tertiary: #e53170; --active: #00ff88; --away: #3e3e42; --text: #ececed; }
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        
+        body, html { background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; height: 100%; overflow: hidden; }
 
-        .app-layout { display: flex; height: 100vh; width: 100vw; }
+        .app-layout { display: flex; height: 100vh; width: 100vw; flex-direction: row; }
 
-        /* Video Section */
+        /* --- VIDEO SECTION --- */
         .video-section { flex: 3; display: flex; flex-direction: column; background: #000; position: relative; }
         .nav-bar { padding: 10px; display: flex; gap: 8px; background: var(--card); border-bottom: 1px solid #29292e; z-index: 100; }
-        .nav-bar input { background: #1a1a1e; border: 1px solid #29292e; padding: 10px 15px; border-radius: 12px; color: #fff; flex: 1; font-size: 13px; }
-        .btn-putar { background: var(--tertiary); color: #fff; border: none; padding: 0 18px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.2s; }
+        .nav-bar input { background: #000; border: 1px solid #333; padding: 10px 15px; border-radius: 12px; color: #fff; flex: 1; font-size: 13px; }
+        .btn-putar { background: var(--tertiary); color: #fff; border: none; padding: 0 18px; border-radius: 12px; font-weight: 800; cursor: pointer; }
 
-        /* Player Container Fix */
-        .player-wrapper { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        #dplayer { width: 100% !important; height: 100% !important; }
-        #yt-player { position: absolute; top:0; left:0; width: 100%; height: 100%; z-index: 10; background: #000; }
+        .player-wrapper { flex: 1; position: relative; background: #000; overflow: hidden; }
+        #dplayer, #yt-player { width: 100% !important; height: 100% !important; position: absolute; }
         .hidden { display: none !important; }
 
-        /* LED Presence Indicator */
-        .led { width: 10px; height: 10px; border-radius: 50%; position: absolute; bottom: 0; right: 0; border: 2px solid var(--card); }
-        .led-active { background: var(--active); box-shadow: 0 0 8px var(--active); }
-        .led-away { background: var(--away); box-shadow: none; }
-
-        /* Sidebar Section */
-        .sidebar { width: 360px; background: var(--card); display: flex; flex-direction: column; border-left: 1px solid #29292e; }
-        .sidebar-header { padding: 15px; font-weight: 800; font-size: 12px; letter-spacing: 1px; color: #7c7c8a; border-bottom: 1px solid #29292e; display: flex; justify-content: space-between; }
+        /* --- SIDEBAR SECTION --- */
+        .sidebar { width: 360px; background: var(--card); display: flex; flex-direction: column; border-left: 1px solid #242629; position: relative; }
         
-        .user-scroll { padding: 12px; display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid #29292e; }
+        .sidebar-header { padding: 12px 15px; font-weight: 800; font-size: 11px; letter-spacing: 1.5px; color: #71717a; border-bottom: 1px solid #242629; display: flex; justify-content: space-between; }
+        
+        /* User List */
+        .user-scroll { padding: 10px 15px; display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid #242629; }
         .user-box { position: relative; flex-shrink: 0; }
-        .avatar { width: 42px; height: 42px; border-radius: 14px; background: #29292e; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: 14px; }
+        .avatar { width: 40px; height: 40px; border-radius: 12px; background: #27272a; display: flex; align-items: center; justify-content: center; font-weight: 800; border: 1px solid #3f3f46; font-size: 14px; }
+        
+        /* LED Indikator Glow */
+        .led { width: 10px; height: 10px; border-radius: 50%; position: absolute; bottom: -2px; right: -2px; border: 2px solid var(--card); }
+        .led-active { background: var(--active); box-shadow: 0 0 10px var(--active); }
+        .led-away { background: var(--away); }
 
         /* Chat Area */
-        #chat-content { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; background: #09090a; }
-        .msg { background: #1a1a1e; padding: 10px 14px; border-radius: 15px; max-width: 85%; align-self: flex-start; line-height: 1.4; border: 1px solid #29292e; }
-        .msg.me { align-self: flex-end; background: var(--tertiary); border: none; color: #fff; border-bottom-right-radius: 2px; }
-        .msg b { display: block; font-size: 10px; margin-bottom: 4px; opacity: 0.6; }
+        #chat-content { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; background: #0c0c0e; }
+        .msg { background: #1c1c1f; padding: 10px 14px; border-radius: 14px; max-width: 85%; align-self: flex-start; border: 1px solid #27272a; font-size: 14px; }
+        .msg.me { align-self: flex-end; background: var(--tertiary); border: none; border-bottom-right-radius: 2px; }
+        .msg b { display: block; font-size: 10px; margin-bottom: 2px; color: #a1a1aa; text-transform: uppercase; }
+        .msg.me b { color: #ffd1e1; }
 
-        /* Input Area */
-        .input-box { padding: 15px; background: var(--card); display: flex; gap: 10px; border-top: 1px solid #29292e; align-items: center; }
-        .input-box input { flex: 1; background: #1a1a1e; border: 1px solid #29292e; padding: 12px; border-radius: 12px; color: #fff; }
-        .btn-circle { width: 42px; height: 42px; border-radius: 12px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; }
+        /* Reaction Bar */
+        .reaction-bar { display: flex; justify-content: space-around; padding: 8px; background: #0c0c0e; border-top: 1px solid #242629; }
+        .reaction-bar span { cursor: pointer; font-size: 20px; transition: 0.2s; }
+        .reaction-bar span:hover { transform: scale(1.3); }
 
-        /* Reaction Overlay */
-        #reaksi-layer { position: absolute; inset: 0; pointer-events: none; z-index: 150; }
-        .emo-fly { position: absolute; bottom: 10%; font-size: 35px; animation: flyUp 2.5s forwards; }
-        @keyframes flyUp { 0% { transform: translateY(0) scale(0.5); opacity:0; } 20% { opacity:1; } 100% { transform: translateY(-400px) rotate(20deg); opacity:0; } }
+        /* Input Chat Area Fix */
+        .input-area { padding: 12px 15px 25px; background: var(--card); display: flex; gap: 10px; border-top: 1px solid #242629; align-items: center; }
+        .input-area input { flex: 1; background: #000; border: 1px solid #29292e; padding: 12px 15px; border-radius: 12px; color: #fff; font-size: 14px; }
+        .input-area input:focus { border-color: var(--tertiary); }
+        .btn-action { width: 42px; height: 42px; border-radius: 12px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; transition: 0.2s; }
 
-        /* Mobile Optimization */
+        /* Animation Reaksi */
+        #reaksi-layer { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
+        .emo-fly { position: absolute; bottom: 20%; font-size: 40px; animation: fly 2.5s ease-out forwards; }
+        @keyframes fly { 
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            20% { opacity: 1; transform: translateY(-20px) scale(1.2); }
+            100% { transform: translateY(-350px) rotate(15deg); opacity: 0; } 
+        }
+
+        /* Mobile Responsive Fix */
         @media (max-width: 850px) {
             .app-layout { flex-direction: column; }
-            .video-section { height: 35vh; flex: none; }
+            .video-section { height: 32vh; flex: none; }
             .sidebar { width: 100%; flex: 1; border-left: none; }
-            .nav-bar { padding: 8px; }
-            #chat-content { height: 40vh; }
+            .input-area { padding-bottom: 15px; } /* Menyesuaikan agar tidak mentok navigasi HP */
         }
     </style>
 </head>
 <body>
 
-<div id="login" style="position:fixed; inset:0; z-index:9999; background:var(--bg); display:flex; align-items:center; justify-content:center; backdrop-filter: blur(20px);">
-    <div style="background:var(--card); padding:40px; border-radius:24px; text-align:center; width: 320px; border: 1px solid #29292e;">
-        <h2 style="margin-top:0; color:#fff;">Watch Party</h2>
-        <input type="text" id="user-name" placeholder="Nama kamu..." style="width:100%; padding:12px; background:#1a1a1e; border:1px solid #29292e; color:#fff; border-radius:12px; text-align:center; margin-bottom:20px;">
-        <button onclick="gabung()" style="width:100%; padding:12px; background:var(--tertiary); color:#fff; border:none; border-radius:12px; font-weight:800; cursor:pointer;">MASUK</button>
+<div id="login" style="position:fixed; inset:0; z-index:9999; background:var(--bg); display:flex; align-items:center; justify-content:center;">
+    <div style="background:var(--card); padding:35px; border-radius:24px; text-align:center; width: 320px; border: 1px solid #242629; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+        <h2 style="margin:0 0 20px; font-weight: 800; color:#fff;">Watch Party Pro</h2>
+        <input type="text" id="user-name" placeholder="Username..." style="width:100%; padding:14px; background:#000; border:1px solid #242629; color:#fff; border-radius:12px; text-align:center; margin-bottom:20px;">
+        <button onclick="gabung()" style="width:100%; padding:14px; background:var(--tertiary); color:#fff; border:none; border-radius:12px; font-weight:800; cursor:pointer;">MASUK</button>
     </div>
 </div>
 
 <div class="app-layout">
     <div class="video-section">
         <div class="nav-bar">
-            <input type="text" id="inputUrl" placeholder="Paste link YouTube / MP4 / m3u8...">
+            <input type="text" id="inputUrl" placeholder="Paste Video Link...">
             <button class="btn-putar" onclick="putarSekarang()">PUTAR</button>
         </div>
         <div class="player-wrapper">
@@ -91,21 +102,21 @@
     </div>
 
     <div class="sidebar">
-        <div class="sidebar-header">PENONTON ONLINE <span id="counter" style="color:var(--tertiary)">0</span></div>
+        <div class="sidebar-header">ONLINE USERS <span id="counter" style="color:var(--tertiary)">0</span></div>
         <div class="user-scroll" id="user-list"></div>
         <div id="chat-content"></div>
         
-        <div style="padding: 10px; display:flex; gap:10px; justify-content: center; background: #09090a;">
-            <span onclick="sendEmo('🔥')" style="cursor:pointer; font-size:20px;">🔥</span>
-            <span onclick="sendEmo('😂')" style="cursor:pointer; font-size:20px;">😂</span>
-            <span onclick="sendEmo('❤️')" style="cursor:pointer; font-size:20px;">❤️</span>
-            <span onclick="sendEmo('👏')" style="cursor:pointer; font-size:20px;">👏</span>
+        <div class="reaction-bar">
+            <span onclick="sendEmo('🔥')">🔥</span>
+            <span onclick="sendEmo('😂')">😂</span>
+            <span onclick="sendEmo('❤️')">❤️</span>
+            <span onclick="sendEmo('👏')">👏</span>
         </div>
 
-        <div class="input-box">
-            <button class="btn-circle" style="background:#22c55e" id="btnVn" onmousedown="mulaiVn()" onmouseup="stopVn()" ontouchstart="mulaiVn()" ontouchend="stopVn()">🎤</button>
-            <input type="text" id="inputChat" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') kirimChat()">
-            <button class="btn-circle" style="background:var(--tertiary)" onclick="kirimChat()">➤</button>
+        <div class="input-area">
+            <button class="btn-action" style="background:#22c55e" id="btnVn" onmousedown="mulaiVn()" onmouseup="stopVn()" ontouchstart="mulaiVn()" ontouchend="stopVn()">🎤</button>
+            <input type="text" id="inputChat" placeholder="Type a message..." onkeypress="if(event.key==='Enter') kirimChat()">
+            <button class="btn-action" style="background:var(--tertiary)" onclick="kirimChat()">➤</button>
         </div>
     </div>
 </div>
@@ -114,7 +125,6 @@
     const socket = io();
     let dp, ytPlayer, isSync = false, mediaRec, audioChunks = [];
 
-    // Init DPlayer
     dp = new DPlayer({
         container: document.getElementById('dplayer'),
         video: { url: '', type: 'auto' },
@@ -126,8 +136,6 @@
         if(!n) return;
         socket.emit('join', n);
         document.getElementById('login').style.display = 'none';
-        
-        // LED Status Detection
         document.addEventListener('visibilitychange', () => {
             socket.emit('presence-change', document.visibilityState === 'visible' ? 'active' : 'away');
         });
@@ -137,25 +145,23 @@
         document.getElementById('counter').innerText = list.length;
         document.getElementById('user-list').innerHTML = list.map(u => `
             <div class="user-box">
-                <div class="avatar" style="border: 2px solid ${u.color}aa">${u.name[0].toUpperCase()}</div>
+                <div class="avatar" style="border-color: ${u.color}">${u.name[0].toUpperCase()}</div>
                 <div class="led ${u.status === 'active' ? 'led-active' : 'led-away'}"></div>
             </div>
         `).join('');
     });
 
-    // Reaksi Emoji
     function sendEmo(e) { socket.emit('send-reaction', e); showEmo(e); }
     socket.on('floating-reaction', e => showEmo(e));
     function showEmo(e) {
         const div = document.createElement('div');
         div.className = 'emo-fly';
         div.innerText = e;
-        div.style.left = Math.random() * 80 + 10 + '%';
+        div.style.left = Math.random() * 70 + 15 + '%';
         document.getElementById('reaksi-layer').appendChild(div);
         setTimeout(() => div.remove(), 2500);
     }
 
-    // Video Control
     function putarSekarang() {
         const url = document.getElementById('inputUrl').value; if(!url) return;
         const isYt = url.includes('youtube.com') || url.includes('youtu.be');
@@ -176,11 +182,9 @@
             dp.switchVideo({ url: data.url, type: 'auto' });
             dp.play();
         }
-        // Fix Video Gelap: Re-scale DPlayer
         setTimeout(() => { window.dispatchEvent(new Event('resize')); isSync = false; }, 1000);
     }
 
-    // YT API
     var tag = document.createElement('script'); tag.src = "https://www.youtube.com/iframe_api";
     document.body.appendChild(tag);
     function onYouTubeIframeAPIReady() {
@@ -208,7 +212,6 @@
         }
     });
 
-    // Chat & VN
     function kirimChat() {
         const i = document.getElementById('inputChat'); if(!i.value) return;
         socket.emit('new-message', { name: document.getElementById('user-name').value, text: i.value, type: 'text' });
@@ -230,7 +233,7 @@
                 };
             };
             mediaRec.start();
-        } catch(e) {}
+        } catch(e) { alert("Mic access denied"); }
     }
     function stopVn() { if(mediaRec) { mediaRec.stop(); document.getElementById('btnVn').style.animation = "none"; } }
 
