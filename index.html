@@ -1,176 +1,117 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Watch Party Final</title>
-<script src="/socket.io/socket.io.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<link href="https://unpkg.com/phosphor-icons@1.4.2/src/css/icons.css" rel="stylesheet">
-<style>
-:root{
-  --bg:#0f172a;
-  --card:#111827;
-  --primary:#22c55e;
-  --accent:#38bdf8;
-  --text:#e5e7eb;
-  --muted:#94a3b8;
-}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,sans-serif;}
-header{padding:16px 20px;background:linear-gradient(90deg,#22c55e,#38bdf8);font-weight:700;color:#022c22;}
-main{display:grid;grid-template-columns:3fr 1fr;height:calc(100vh - 60px);}
-.video-area{padding:16px}
-.controls{display:flex;gap:10px;margin-bottom:12px;}
-input{flex:1;padding:12px;border-radius:12px;border:none;outline:none;}
-button{padding:12px 16px;border:none;border-radius:12px;background:var(--primary);color:#022c22;font-weight:700;cursor:pointer;}
-#player-wrap{width:100%;height:100%;background:black;border-radius:16px;overflow:hidden;}
-iframe,video{width:100%;height:100%;border:0;}
-aside{background:var(--card);padding:16px;display:flex;flex-direction:column;gap:10px;}
-.user{display:flex;align-items:center;gap:8px;padding:8px;background:#020617;border-radius:10px;font-size:13px;}
-.green{color:#22c55e}
-.gray{color:#64748b}
-.login{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;background:rgba(0,0,0,.85);}
-.login-card{background:var(--card);padding:30px;border-radius:20px;width:280px;text-align:center;}
-#chat-box{flex:1;overflow-y:auto;background:#0f172a;padding:10px;border-radius:12px;margin-top:10px;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Party Pro</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #0f0e17; --headline: #fffffe; --paragraph: #a7a9be; --tertiary: #e53170; --card: #16161a; }
+        body { background: var(--bg); color: var(--paragraph); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .main-layout { display: flex; gap: 20px; max-width: 1300px; width: 100%; height: 85vh; }
+        
+        /* Video Section */
+        .video-section { flex: 2.5; background: var(--card); padding: 25px; border-radius: 20px; border: 1px solid #242629; display: flex; flex-direction: column; }
+        .header { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { background: #0f0e17; border: 1px solid #333; padding: 12px; border-radius: 10px; color: white; flex: 1; outline: none; }
+        button { background: var(--tertiary); color: white; border: none; padding: 0 20px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+
+        .video-container { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; background: #000; border-radius: 15px; overflow: hidden; }
+        #player { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; }
+
+        /* Chat Section */
+        .chat-section { flex: 1; background: var(--card); padding: 25px; border-radius: 20px; border: 1px solid #242629; display: flex; flex-direction: column; min-width: 300px; }
+        #chat-box { flex: 1; overflow-y: auto; margin-bottom: 15px; }
+        .msg { background: #242629; padding: 10px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; width: fit-content; max-width: 90%; }
+        .msg b { color: var(--tertiary); display: block; font-size: 12px; }
+        h2 { color: var(--headline); margin: 0 0 15px 0; }
+    </style>
 </head>
 <body>
 
-<div class="login" id="login">
-  <div class="login-card">
-    <h2>Watch Party</h2>
-    <input id="nickname" placeholder="Nickname"><br><br>
-    <label><input type="checkbox" id="hostCheck"> Host</label><br><br>
-    <button onclick="join()">Join</button>
-  </div>
+<div class="main-layout">
+    <div class="video-section">
+        <h2>🎥 Streaming Room</h2>
+        <div class="header">
+            <input type="text" id="urlInput" placeholder="ID Video YouTube (Contoh: dQw4w9WgXcQ)">
+            <button onclick="changeVideo()">GANTI VIDEO</button>
+        </div>
+        <div class="video-container">
+            <div id="player"></div>
+        </div>
+    </div>
+
+    <div class="chat-section">
+        <h2>💬 Chat</h2>
+        <div id="chat-box"></div>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="chatInput" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') sendChat()">
+            <button onclick="sendChat()">KIRIM</button>
+        </div>
+    </div>
 </div>
 
-<header>🎬 Watch Party</header>
-
-<main>
-  <div class="video-area">
-    <div class="controls">
-      <input id="url" placeholder="Paste link video apa aja">
-      <button onclick="setVideo()">Putar</button>
-      <button onclick="play()">▶</button>
-      <button onclick="pause()">⏸</button>
-    </div>
-    <div id="player-wrap">
-      <iframe id="player" allow="autoplay"></iframe>
-    </div>
-    <div id="chat-box"></div>
-    <div style="display:flex; gap:6px; margin-top:6px;">
-      <input id="chatInput" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') sendChat()">
-      <button onclick="sendChat()">KIRIM</button>
-    </div>
-  </div>
-
-  <aside>
-    <strong>👥 Users</strong>
-    <div id="users"></div>
-  </aside>
-</main>
-
 <script>
-const socket = io();
-let player = document.getElementById("player");
-let isHost = false;
+    const socket = io();
+    let player, isSyncing = false;
 
-function resolveEmbed(url){
-  url = url.trim();
-  if(url.includes("youtube.com")||url.includes("youtu.be")){
-    let id = url.includes("v=")?url.split("v=")[1].split("&")[0]:url.split("/").pop();
-    return { type:"iframe", src:`https://www.youtube.com/embed/${id}?autoplay=1&enablejsapi=1` };
-  }
-  if(url.includes("vimeo.com")){
-    const id = url.split("/").pop();
-    return { type:"iframe", src:`https://player.vimeo.com/video/${id}?autoplay=1` };
-  }
-  if(url.match(/\.(mp4|webm)$/)){
-    return { type:"video", src:url };
-  }
-  return { type:"iframe", src:url };
-}
+    // Load YouTube API
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
 
-function join(){
-  const n = nickname.value.trim();
-  if(!n) return;
-  isHost = hostCheck.checked;
-  socket.emit("join",{name:n,isHost});
-  login.style.display="none";
-}
-
-function setVideo(){ if(isHost) socket.emit("intent-set-video", url.value); }
-function play(){ if(isHost) socket.emit("intent-play"); }
-function pause(){ if(isHost) socket.emit("intent-pause"); }
-
-socket.on("sync", state=>{
-  if(!state.hostId) return;
-  isHost = (socket.id===state.hostId);
-
-  if(state.videoUrl){
-    const res = resolveEmbed(state.videoUrl);
-    if(res.type==="video"){
-      player.outerHTML = `<video id="player" controls autoplay>
-        <source src="${res.src}">
-      </video>`;
-      player = document.getElementById("player");
-    }else{
-      if(player.tagName!=="IFRAME"){
-        document.getElementById("player-wrap").innerHTML =
-          `<iframe id="player" allow="autoplay"></iframe>`;
-        player = document.getElementById("player");
-      }
-      if(player.src!==res.src) player.src=res.src;
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+            videoId: 'dQw4w9WgXcQ',
+            events: { 'onStateChange': onPlayerStateChange }
+        });
     }
-  }
 
-  if(player.tagName==="IFRAME"){
-    try{
-      if(state.playing) player.contentWindow?.postMessage('{"event":"command","func":"playVideo"}',"*");
-      else player.contentWindow?.postMessage('{"event":"command","func":"pauseVideo"}',"*");
-    }catch(e){}
-  }else{
-    if(state.playing) player.play();
-    else player.pause();
-  }
+    // Mengirim Perintah ke Server
+    function onPlayerStateChange(event) {
+        if (isSyncing) return; // Jangan kirim sinyal jika sedang di-sinkronkan
+        const time = player.getCurrentTime();
+        if (event.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action: 'play', time });
+        if (event.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action: 'pause', time });
+    }
 
-  if(isHost && player.tagName==="VIDEO"){
-    player.onseeked = ()=> socket.emit("intent-seek", player.currentTime);
-  }
-});
+    function changeVideo() {
+        const vid = document.getElementById('urlInput').value;
+        if(!vid) return;
+        socket.emit('video-control', { action: 'change', vid });
+        player.loadVideoById(vid);
+    }
 
-socket.on("users", users=>{
-  const box = document.getElementById("users");
-  box.innerHTML="";
-  Object.values(users).forEach(u=>{
-    const cls = u.status==="watching"?"green":"gray";
-    box.innerHTML += `<div class="user"><i class="ph-eye ${cls}"></i>${u.name}</div>`;
-  });
-});
+    // Menerima Perintah dari Server
+    socket.on('video-control', (data) => {
+        isSyncing = true; // Kunci agar tidak mengirim balik
+        if (data.action === 'play') {
+            if (Math.abs(player.getCurrentTime() - data.time) > 2) player.seekTo(data.time, true);
+            player.playVideo();
+        }
+        if (data.action === 'pause') player.pauseVideo();
+        if (data.action === 'change') player.loadVideoById(data.vid);
+        
+        setTimeout(() => isSyncing = false, 1200); // Buka kunci setelah transisi selesai
+    });
 
-socket.on("chat-receive", data=>{
-  const b=document.getElementById("chat-box");
-  b.innerHTML += `<div style="margin-bottom:4px"><b>${data.user}:</b> ${data.msg}</div>`;
-  b.scrollTop=b.scrollHeight;
-});
+    // Fitur Chat
+    function sendChat() {
+        const msg = document.getElementById('chatInput').value;
+        if(!msg) return;
+        socket.emit('new-message', { user: 'Seseorang', text: msg });
+        addMessage("Kamu", msg);
+        document.getElementById('chatInput').value = "";
+    }
 
-function sendChat(){
-  const i = document.getElementById("chatInput");
-  const n = nickname.value.trim();
-  if(!i.value) return;
-  socket.emit("new-message",{user:n,msg:i.value});
-  const b=document.getElementById("chat-box");
-  b.innerHTML += `<div style="margin-bottom:4px;color:#94a3b8"><b>Kamu:</b> ${i.value}</div>`;
-  i.value="";
-  b.scrollTop=b.scrollHeight;
-}
+    socket.on('chat-receive', (data) => { addMessage(data.user, data.text); });
 
-document.addEventListener("visibilitychange",()=>{
-  socket.emit("status",document.hidden?"away":"watching");
-});
+    function addMessage(user, text) {
+        const box = document.getElementById('chat-box');
+        box.innerHTML += `<div class="msg"><b>${user}</b>${text}</div>`;
+        box.scrollTop = box.scrollHeight;
+    }
 </script>
-
 </body>
 </html>
