@@ -4,321 +4,243 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="referrer" content="no-referrer" />
-    <title>Watch Party Ultra - All Device</title>
+    <title>Watch Party Pro LED</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0a0a0c; --card: #16161a; --tertiary: #e53170; --active: #2ecc71; --away: #95a5a6; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
-        body, html { 
-            background: var(--bg); 
-            color: #a7a9be; 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            margin: 0; 
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            overflow: hidden; 
-        }
-        
-        /* Main Layout - Flexbox Pro */
-        .app-layout { 
-            display: flex; 
-            height: 100vh; 
-            width: 100vw; 
-            flex-direction: row;
-        }
-        
+        :root { --bg: #050505; --card: #121214; --tertiary: #e53170; --active: #00ff88; --away: #3e3e42; }
+        * { box-sizing: border-box; outline: none; }
+        body, html { background: var(--bg); color: #e1e1e6; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; height: 100vh; overflow: hidden; }
+
+        .app-layout { display: flex; height: 100vh; width: 100vw; }
+
         /* Video Section */
-        .video-main { 
-            flex: 1; 
-            display: flex; 
-            flex-direction: column; 
-            background: #000; 
-            position: relative;
-        }
+        .video-section { flex: 3; display: flex; flex-direction: column; background: #000; position: relative; }
+        .nav-bar { padding: 10px; display: flex; gap: 8px; background: var(--card); border-bottom: 1px solid #29292e; z-index: 100; }
+        .nav-bar input { background: #1a1a1e; border: 1px solid #29292e; padding: 10px 15px; border-radius: 12px; color: #fff; flex: 1; font-size: 13px; }
+        .btn-putar { background: var(--tertiary); color: #fff; border: none; padding: 0 18px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.2s; }
 
-        .nav-bar { 
-            padding: 10px 15px; 
-            display: flex; 
-            gap: 8px; 
-            background: var(--card); 
-            z-index: 100;
-            border-bottom: 1px solid #242629;
-        }
-
-        .nav-bar input { 
-            background: #000; 
-            border: 1px solid #333; 
-            padding: 8px 12px; 
-            border-radius: 8px; 
-            color: #fff; 
-            flex: 1; 
-            font-size: 14px;
-            outline: none; 
-        }
-
-        .btn-play { 
-            background: var(--tertiary); 
-            color: #fff; 
-            border: none; 
-            padding: 0 15px; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            font-weight: bold; 
-            font-size: 13px;
-        }
-        
-        /* Container Player yang Auto-Resize */
-        .player-container { 
-            position: relative; 
-            flex: 1;
-            background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #dplayer, #yt-player { 
-            position: absolute;
-            top: 0; left: 0;
-            width: 100% !important; 
-            height: 100% !important; 
-        }
-        
+        /* Player Container Fix */
+        .player-wrapper { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        #dplayer { width: 100% !important; height: 100% !important; }
+        #yt-player { position: absolute; top:0; left:0; width: 100%; height: 100%; z-index: 10; background: #000; }
         .hidden { display: none !important; }
 
-        /* Reaction Layer */
-        #reaction-layer { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
-        .floating-emoji { position: absolute; bottom: 20%; font-size: 30px; animation: floatUp 2.5s forwards ease-out; opacity: 0; }
-        @keyframes floatUp {
-            0% { transform: translateY(0) scale(0.5); opacity: 0; }
-            20% { opacity: 1; transform: translateY(-20px) scale(1.2); }
-            100% { transform: translateY(-400px) scale(1); opacity: 0; }
-        }
+        /* LED Presence Indicator */
+        .led { width: 10px; height: 10px; border-radius: 50%; position: absolute; bottom: 0; right: 0; border: 2px solid var(--card); }
+        .led-active { background: var(--active); box-shadow: 0 0 8px var(--active); }
+        .led-away { background: var(--away); box-shadow: none; }
 
         /* Sidebar Section */
-        .sidebar { 
-            width: 350px; 
-            background: var(--card); 
-            display: flex; 
-            flex-direction: column; 
-            border-left: 1px solid #242629;
-        }
-
-        .sidebar-header { padding: 12px 15px; font-weight: 800; border-bottom: 1px solid #242629; color: #fff; display: flex; justify-content: space-between; font-size: 14px;}
+        .sidebar { width: 360px; background: var(--card); display: flex; flex-direction: column; border-left: 1px solid #29292e; }
+        .sidebar-header { padding: 15px; font-weight: 800; font-size: 12px; letter-spacing: 1px; color: #7c7c8a; border-bottom: 1px solid #29292e; display: flex; justify-content: space-between; }
         
-        .user-list { padding: 10px; display: flex; gap: 8px; overflow-x: auto; background: rgba(0,0,0,0.1); border-bottom: 1px solid #242629; scrollbar-width: none; }
-        .user-avatar { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #000; font-weight: 800; position: relative; flex-shrink: 0; font-size: 14px; }
-        .status-icon { position: absolute; -right: 4px; -top: -4px; font-size: 10px; }
+        .user-scroll { padding: 12px; display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid #29292e; }
+        .user-box { position: relative; flex-shrink: 0; }
+        .avatar { width: 42px; height: 42px; border-radius: 14px; background: #29292e; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: 14px; }
 
-        #chat-box { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
-        .chat-msg { background: #242629; padding: 10px 12px; border-radius: 12px; max-width: 85%; align-self: flex-start; color: #fff; font-size: 14px; }
-        .chat-msg.me { align-self: flex-end; background: var(--tertiary); border-bottom-right-radius: 2px; }
-        .chat-msg b { display: block; font-size: 10px; margin-bottom: 3px; opacity: 0.7; }
+        /* Chat Area */
+        #chat-content { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; background: #09090a; }
+        .msg { background: #1a1a1e; padding: 10px 14px; border-radius: 15px; max-width: 85%; align-self: flex-start; line-height: 1.4; border: 1px solid #29292e; }
+        .msg.me { align-self: flex-end; background: var(--tertiary); border: none; color: #fff; border-bottom-right-radius: 2px; }
+        .msg b { display: block; font-size: 10px; margin-bottom: 4px; opacity: 0.6; }
 
-        /* Mobile Controls */
-        .chat-input-area { padding: 12px; background: var(--card); border-top: 1px solid #242629; display: flex; gap: 8px; align-items: center; }
-        .chat-input-area input { background: #000; border: 1px solid #333; padding: 10px; border-radius: 10px; color: #fff; flex: 1; outline: none; }
-        .btn-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; font-size: 18px; color: #fff; }
-        .btn-vn { background: #22c55e; }
-        .btn-send { background: var(--tertiary); }
-        .recording { animation: pulse 1s infinite; background: #ff4757 !important; }
+        /* Input Area */
+        .input-box { padding: 15px; background: var(--card); display: flex; gap: 10px; border-top: 1px solid #29292e; align-items: center; }
+        .input-box input { flex: 1; background: #1a1a1e; border: 1px solid #29292e; padding: 12px; border-radius: 12px; color: #fff; }
+        .btn-circle { width: 42px; height: 42px; border-radius: 12px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; }
 
-        /* Quick Reaction Float Bar */
-        .quick-react { position: absolute; bottom: 20px; left: 10px; display: flex; gap: 5px; z-index: 210; }
-        .react-dot { background: rgba(0,0,0,0.6); border: none; border-radius: 50%; width: 35px; height: 35px; font-size: 18px; cursor: pointer; backdrop-filter: blur(5px); }
+        /* Reaction Overlay */
+        #reaksi-layer { position: absolute; inset: 0; pointer-events: none; z-index: 150; }
+        .emo-fly { position: absolute; bottom: 10%; font-size: 35px; animation: flyUp 2.5s forwards; }
+        @keyframes flyUp { 0% { transform: translateY(0) scale(0.5); opacity:0; } 20% { opacity:1; } 100% { transform: translateY(-400px) rotate(20deg); opacity:0; } }
 
-        /* RESPONSIVE BREAKPOINTS */
-        @media (max-width: 900px) {
+        /* Mobile Optimization */
+        @media (max-width: 850px) {
             .app-layout { flex-direction: column; }
+            .video-section { height: 35vh; flex: none; }
             .sidebar { width: 100%; flex: 1; border-left: none; }
-            .video-main { height: 30vh; flex: none; } /* Tetap kecil di atas agar chat luas */
-            .quick-react { bottom: auto; top: 10px; left: 10px; flex-direction: column; }
-            .nav-bar { padding: 5px 10px; }
+            .nav-bar { padding: 8px; }
+            #chat-content { height: 40vh; }
         }
-
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-<div id="login" style="position:fixed; inset:0; z-index:9999; background:var(--bg); display:flex; align-items:center; justify-content:center;">
-    <div style="background:var(--card); padding:30px; border-radius:20px; text-align:center; border: 1px solid #333; width: 90%; max-width: 320px;">
-        <h2 style="color:white; margin-top:0;">Watch Party</h2>
-        <input type="text" id="my-name" placeholder="Siapa namamu?" style="width:100%; margin-bottom:15px; text-align:center;">
-        <button onclick="joinRoom()" class="btn-play" style="width:100%; height:45px;">MULAI</button>
+<div id="login" style="position:fixed; inset:0; z-index:9999; background:var(--bg); display:flex; align-items:center; justify-content:center; backdrop-filter: blur(20px);">
+    <div style="background:var(--card); padding:40px; border-radius:24px; text-align:center; width: 320px; border: 1px solid #29292e;">
+        <h2 style="margin-top:0; color:#fff;">Watch Party</h2>
+        <input type="text" id="user-name" placeholder="Nama kamu..." style="width:100%; padding:12px; background:#1a1a1e; border:1px solid #29292e; color:#fff; border-radius:12px; text-align:center; margin-bottom:20px;">
+        <button onclick="gabung()" style="width:100%; padding:12px; background:var(--tertiary); color:#fff; border:none; border-radius:12px; font-weight:800; cursor:pointer;">MASUK</button>
     </div>
 </div>
 
 <div class="app-layout">
-    <div class="video-main">
+    <div class="video-section">
         <div class="nav-bar">
-            <input type="text" id="urlInput" placeholder="Paste link video/YouTube...">
-            <button class="btn-play" onclick="handlePutar()">PUTAR</button>
+            <input type="text" id="inputUrl" placeholder="Paste link YouTube / MP4 / m3u8...">
+            <button class="btn-putar" onclick="putarSekarang()">PUTAR</button>
         </div>
-        <div class="player-container">
+        <div class="player-wrapper">
             <div id="dplayer"></div>
             <div id="yt-player" class="hidden"></div>
-            <div id="reaction-layer"></div>
-            
-            <div class="quick-react">
-                <button class="react-dot" onclick="sendReaction('🔥')">🔥</button>
-                <button class="react-dot" onclick="sendReaction('😂')">😂</button>
-                <button class="react-dot" onclick="sendReaction('❤️')">❤️</button>
-            </div>
+            <div id="reaksi-layer"></div>
         </div>
     </div>
-    
+
     <div class="sidebar">
-        <div class="sidebar-header">ONLINE <span id="user-count" style="color:var(--tertiary)">0</span></div>
-        <div class="user-list" id="users"></div>
-        <div id="chat-box"></div>
-        <div class="chat-input-area">
-            <button class="btn-icon btn-vn" id="vnBtn" onmousedown="startRecord()" onmouseup="stopRecord()" ontouchstart="startRecord()" ontouchend="stopRecord()">🎤</button>
-            <input type="text" id="chatInput" placeholder="Ketik..." onkeypress="if(event.key==='Enter') sendChat()">
-            <button class="btn-icon btn-send" onclick="sendChat()">➤</button>
+        <div class="sidebar-header">PENONTON ONLINE <span id="counter" style="color:var(--tertiary)">0</span></div>
+        <div class="user-scroll" id="user-list"></div>
+        <div id="chat-content"></div>
+        
+        <div style="padding: 10px; display:flex; gap:10px; justify-content: center; background: #09090a;">
+            <span onclick="sendEmo('🔥')" style="cursor:pointer; font-size:20px;">🔥</span>
+            <span onclick="sendEmo('😂')" style="cursor:pointer; font-size:20px;">😂</span>
+            <span onclick="sendEmo('❤️')" style="cursor:pointer; font-size:20px;">❤️</span>
+            <span onclick="sendEmo('👏')" style="cursor:pointer; font-size:20px;">👏</span>
+        </div>
+
+        <div class="input-box">
+            <button class="btn-circle" style="background:#22c55e" id="btnVn" onmousedown="mulaiVn()" onmouseup="stopVn()" ontouchstart="mulaiVn()" ontouchend="stopVn()">🎤</button>
+            <input type="text" id="inputChat" placeholder="Ketik pesan..." onkeypress="if(event.key==='Enter') kirimChat()">
+            <button class="btn-circle" style="background:var(--tertiary)" onclick="kirimChat()">➤</button>
         </div>
     </div>
 </div>
 
 <script>
     const socket = io();
-    const ytDiv = document.getElementById('yt-player');
-    const reactionLayer = document.getElementById('reaction-layer');
-    const chatBox = document.getElementById('chat-box');
-    let dp, ytPlayer, isSyncing = false, mediaRecorder, audioChunks = [];
+    let dp, ytPlayer, isSync = false, mediaRec, audioChunks = [];
 
-    // Inisialisasi Player
+    // Init DPlayer
     dp = new DPlayer({
         container: document.getElementById('dplayer'),
-        video: { url: '', type: 'hls' },
+        video: { url: '', type: 'auto' },
         theme: '#e53170'
     });
 
-    function joinRoom() {
-        const n = document.getElementById('my-name').value;
+    function gabung() {
+        const n = document.getElementById('user-name').value;
         if(!n) return;
         socket.emit('join', n);
         document.getElementById('login').style.display = 'none';
         
-        // Deteksi Focus/Away
+        // LED Status Detection
         document.addEventListener('visibilitychange', () => {
             socket.emit('presence-change', document.visibilityState === 'visible' ? 'active' : 'away');
         });
     }
 
-    // Reaction
-    function sendReaction(emoji) {
-        socket.emit('send-reaction', emoji);
-        showReaction(emoji);
-    }
-    socket.on('floating-reaction', (emoji) => showReaction(emoji));
-    function showReaction(emoji) {
-        const el = document.createElement('div');
-        el.className = 'floating-emoji';
-        el.innerText = emoji;
-        el.style.left = Math.random() * 70 + 15 + '%';
-        reactionLayer.appendChild(el);
-        setTimeout(() => el.remove(), 2500);
-    }
-
-    // Video Logic
-    function handlePutar() {
-        const url = document.getElementById('urlInput').value; if(!url) return;
-        const isYT = url.includes('youtube.com') || url.includes('youtu.be');
-        const data = { action: 'load', url, type: isYT ? 'yt' : 'raw' };
-        applyChange(data);
-        socket.emit('video-control', data);
-    }
-
-    function applyChange(data) {
-        isSyncing = true;
-        if (data.type === 'yt') {
-            ytDiv.classList.remove('hidden'); dp.pause();
-            const match = data.url.match(/(?:v=|\/)([0-9A-Za-z_-]{11}).*/);
-            if(match) ytPlayer.loadVideoById(match[1]);
-        } else {
-            ytDiv.classList.add('hidden');
-            if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
-            dp.switchVideo({ url: data.url, type: data.url.includes('m3u8') ? 'hls' : 'normal' });
-            dp.play();
-        }
-        setTimeout(() => isSyncing = false, 2000);
-    }
-
-    // YouTube API
-    var tag = document.createElement('script'); tag.src = "https://www.youtube.com/iframe_api";
-    document.body.appendChild(tag);
-    function onYouTubeIframeAPIReady() {
-        ytPlayer = new YT.Player('yt-player', { videoId: '', events: { 'onStateChange': (e) => {
-            if (isSyncing) return;
-            const time = ytPlayer.getCurrentTime();
-            if (e.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action:'play', time, type:'yt' });
-            if (e.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action:'pause', time, type:'yt' });
-        }}});
-    }
-
-    // Sync Events
-    dp.on('play', () => { if(!isSyncing) socket.emit('video-control', { action:'play', time: dp.video.currentTime, type:'raw' }); });
-    dp.on('pause', () => { if(!isSyncing) socket.emit('video-control', { action:'pause', time: dp.video.currentTime, type:'raw' }); });
-    socket.on('video-control', data => {
-        if(data.action==='load') applyChange(data);
-        else {
-            isSyncing = true;
-            if(data.type==='yt'){
-                if(data.action==='play'){ ytPlayer.seekTo(data.time); ytPlayer.playVideo(); } else ytPlayer.pauseVideo();
-            } else {
-                dp.seek(data.time); if(data.action==='play') dp.play(); else dp.pause();
-            }
-            setTimeout(() => isSyncing = false, 1000);
-        }
-    });
-
-    // Chat
     socket.on('update-users', list => {
-        document.getElementById('user-count').innerText = list.length;
-        document.getElementById('users').innerHTML = list.map(u => `
-            <div class="user-avatar" style="background:${u.color}">${u.name[0].toUpperCase()}
-                <div class="status-icon">${u.status === 'active' ? '👁️' : '💤'}</div>
+        document.getElementById('counter').innerText = list.length;
+        document.getElementById('user-list').innerHTML = list.map(u => `
+            <div class="user-box">
+                <div class="avatar" style="border: 2px solid ${u.color}aa">${u.name[0].toUpperCase()}</div>
+                <div class="led ${u.status === 'active' ? 'led-active' : 'led-away'}"></div>
             </div>
         `).join('');
     });
 
-    function sendChat() {
-        const i = document.getElementById('chatInput'); if(!i.value) return;
-        socket.emit('new-message', { name: document.getElementById('my-name').value, text: i.value, type: 'text' });
-        addMsg("me", "Kamu", i.value, "text"); i.value = "";
+    // Reaksi Emoji
+    function sendEmo(e) { socket.emit('send-reaction', e); showEmo(e); }
+    socket.on('floating-reaction', e => showEmo(e));
+    function showEmo(e) {
+        const div = document.createElement('div');
+        div.className = 'emo-fly';
+        div.innerText = e;
+        div.style.left = Math.random() * 80 + 10 + '%';
+        document.getElementById('reaksi-layer').appendChild(div);
+        setTimeout(() => div.remove(), 2500);
     }
 
-    async function startRecord() {
+    // Video Control
+    function putarSekarang() {
+        const url = document.getElementById('inputUrl').value; if(!url) return;
+        const isYt = url.includes('youtube.com') || url.includes('youtu.be');
+        const data = { action: 'load', url, type: isYt ? 'yt' : 'raw' };
+        applyVideo(data);
+        socket.emit('video-control', data);
+    }
+
+    function applyVideo(data) {
+        isSync = true;
+        if(data.type === 'yt') {
+            document.getElementById('yt-player').classList.remove('hidden'); dp.pause();
+            const id = data.url.match(/(?:v=|\/)([0-9A-Za-z_-]{11}).*/)[1];
+            ytPlayer.loadVideoById(id);
+        } else {
+            document.getElementById('yt-player').classList.add('hidden');
+            if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+            dp.switchVideo({ url: data.url, type: 'auto' });
+            dp.play();
+        }
+        // Fix Video Gelap: Re-scale DPlayer
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); isSync = false; }, 1000);
+    }
+
+    // YT API
+    var tag = document.createElement('script'); tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+    function onYouTubeIframeAPIReady() {
+        ytPlayer = new YT.Player('yt-player', { videoId: '', events: { 'onStateChange': (e) => {
+            if (isSync) return;
+            const t = ytPlayer.getCurrentTime();
+            if (e.data == YT.PlayerState.PLAYING) socket.emit('video-control', { action:'play', time:t, type:'yt' });
+            if (e.data == YT.PlayerState.PAUSED) socket.emit('video-control', { action:'pause', time:t, type:'yt' });
+        }}});
+    }
+
+    dp.on('play', () => { if(!isSync) socket.emit('video-control', { action:'play', time:dp.video.currentTime, type:'raw' }); });
+    dp.on('pause', () => { if(!isSync) socket.emit('video-control', { action:'pause', time:dp.video.currentTime, type:'raw' }); });
+
+    socket.on('video-control', d => {
+        if(d.action==='load') applyVideo(d);
+        else {
+            isSync = true;
+            if(d.type==='yt') {
+                if(d.action==='play'){ ytPlayer.seekTo(d.time); ytPlayer.playVideo(); } else ytPlayer.pauseVideo();
+            } else {
+                dp.seek(d.time); if(d.action==='play') dp.play(); else dp.pause();
+            }
+            setTimeout(() => isSync = false, 1000);
+        }
+    });
+
+    // Chat & VN
+    function kirimChat() {
+        const i = document.getElementById('inputChat'); if(!i.value) return;
+        socket.emit('new-message', { name: document.getElementById('user-name').value, text: i.value, type: 'text' });
+        renderMsg("me", "Kamu", i.value, "text"); i.value = "";
+    }
+
+    async function mulaiVn() {
         try {
             const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(s);
-            document.getElementById('vnBtn').classList.add('recording'); audioChunks = [];
-            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-            mediaRecorder.onstop = () => {
+            mediaRec = new MediaRecorder(s);
+            document.getElementById('btnVn').style.animation = "pulse 1s infinite"; audioChunks = [];
+            mediaRec.ondataavailable = e => audioChunks.push(e.data);
+            mediaRec.onstop = () => {
                 const b = new Blob(audioChunks, { type: 'audio/ogg' });
                 const r = new FileReader(); r.readAsDataURL(b);
                 r.onloadend = () => {
-                    socket.emit('new-message', { name: document.getElementById('my-name').value, audio: r.result, type: 'audio' });
-                    addMsg("me", "Kamu", r.result, "audio");
+                    socket.emit('new-message', { name: document.getElementById('user-name').value, audio: r.result, type: 'audio' });
+                    renderMsg("me", "Kamu", r.result, "audio");
                 };
             };
-            mediaRecorder.start();
+            mediaRec.start();
         } catch(e) {}
     }
-    function stopRecord() { if(mediaRecorder) { mediaRecorder.stop(); document.getElementById('vnBtn').classList.remove('recording'); } }
+    function stopVn() { if(mediaRec) { mediaRec.stop(); document.getElementById('btnVn').style.animation = "none"; } }
 
-    socket.on('chat-receive', d => addMsg("other", d.name, d.text || d.audio, d.type, d.color));
-    function addMsg(side, name, content, type, color) {
+    socket.on('chat-receive', d => renderMsg("other", d.name, d.text || d.audio, d.type, d.color));
+    function renderMsg(side, name, cont, type, color) {
+        const box = document.getElementById('chat-content');
         const style = color ? `style="color:${color}"` : "";
-        const html = type === 'text' ? `<span>${content}</span>` : `<audio src="${content}" controls style="width:100%"></audio>`;
-        chatBox.innerHTML += `<div class="chat-msg ${side}"><b ${style}>${name}</b>${html}</div>`;
-        chatBox.scrollTop = chatBox.scrollHeight;
+        const html = type === 'text' ? `<span>${cont}</span>` : `<audio src="${cont}" controls style="width:100%; filter:invert(1)"></audio>`;
+        box.innerHTML += `<div class="msg ${side}"><b ${style}>${name}</b>${html}</div>`;
+        box.scrollTop = box.scrollHeight;
     }
 </script>
 </body>
