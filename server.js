@@ -9,10 +9,6 @@ io.on('connection', (socket) => {
     socket.on('video-control', (data) => {
         socket.broadcast.emit('video-control', data);
     });
-    socket.on('new-message', (data) => {
-        socket.broadcast.emit('chat-receive', data);
-    });
 });
 
-const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log(`Server Ready: http://localhost:${PORT}`));
+http.listen(process.env.PORT || 3000, () => console.log("Server Running..."));
