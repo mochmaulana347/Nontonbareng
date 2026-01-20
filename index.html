@@ -17,11 +17,11 @@
         .nav-bar { padding: 15px; display: flex; gap: 10px; background: var(--card); border-bottom: 1px solid #242629; z-index: 100; }
         input { background: #000; border: 1px solid #333; padding: 10px; border-radius: 8px; color: #fff; flex: 1; outline: none; }
         button { background: var(--tertiary); color: #fff; border: none; padding: 0 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        .video-player-container { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        video, #yt-player { width: 100% !important; height: 100% !important; position: absolute; top: 0; left: 0; }
+        .video-player-container { flex: 1; position: relative; background: #000; overflow: hidden; }
+        video, #yt-player { width: 100% !important; height: 100% !important; position: absolute; top: 0; left: 0; display: block; }
         #player { z-index: 10; }
-        #yt-player { z-index: 5; }
-        .hidden { display: none !important; visibility: hidden; }
+        #yt-player { z-index: 20; }
+        .hidden { display: none !important; visibility: hidden; z-index: -1 !important; }
         .system-logs { padding: 8px 15px; background: rgba(0,0,0,0.9); font-size: 12px; color: var(--tertiary); font-weight: bold; z-index: 50; }
         .sidebar { flex: 1; background: var(--card); border-left: 1px solid #242629; display: flex; flex-direction: column; min-width: 320px; }
         .user-list { padding: 10px; display: flex; gap: 8px; overflow-x: auto; border-bottom: 1px solid #242629; }
@@ -31,7 +31,7 @@
         .chat-msg.me { align-self: flex-end; background: var(--tertiary); color: white; }
         .chat-msg b { display: block; font-size: 10px; margin-bottom: 4px; opacity: 0.8; }
         .chat-input-area { padding: 15px; background: var(--card); border-top: 1px solid #242629; display: flex; gap: 8px; }
-        .btn-vn { background: #22c55e; border-radius: 50%; width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; }
+        .btn-vn { background: #22c55e; border-radius: 50%; width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; border:none; cursor:pointer; }
         .recording { animation: pulse 1s infinite; background: red !important; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         @media (max-width: 768px) { .app-layout { flex-direction: column; } .sidebar { min-width: 100%; flex: 1; } .video-main { height: 35vh; flex: none; } }
@@ -54,7 +54,7 @@
             <button onclick="handlePutar()">PUTAR</button>
         </div>
         <div class="video-player-container">
-            <video id="player" controls playsinline></video>
+            <video id="player" controls playsinline class="hidden"></video>
             <div id="yt-player" class="hidden"></div>
         </div>
         <div class="system-logs" id="logs">Status: Menunggu link...</div>
@@ -95,7 +95,7 @@
     function onYouTubeIframeAPIReady() {
         ytPlayer = new YT.Player('yt-player', {
             videoId: '',
-            playerVars: { 'autoplay': 1, 'playsinline': 1 },
+            playerVars: { 'autoplay': 1, 'playsinline': 1, 'rel': 0 },
             events: { 'onStateChange': (e) => {
                 if (isSyncing) return;
                 const time = ytPlayer.getCurrentTime();
@@ -116,26 +116,32 @@
 
     function applyChange(data) {
         isSyncing = true;
-        logBox.innerText = "Status: Sinkronisasi Player...";
+        logBox.innerText = "Status: Memuat Player...";
         
         if (data.type === 'yt') {
-            ytDiv.classList.remove('hidden'); ytDiv.style.zIndex = "20";
-            video.classList.add('hidden'); video.style.zIndex = "1";
+            // Tampilkan wadah YT dulu agar tidak gelap
+            ytDiv.classList.remove('hidden');
+            video.classList.add('hidden');
+            
             video.pause(); video.src = ""; hls.destroy();
+            
             const match = data.url.match(/(?:v=|\/)([0-9A-Za-z_-]{11}).*/);
-            if(match) ytPlayer.loadVideoById(match[1]);
-            logBox.innerText = "Status: Mode YouTube Aktif";
+            if(match && ytPlayer && ytPlayer.loadVideoById) {
+                ytPlayer.loadVideoById(match[1]);
+                logBox.innerText = "Status: Memutar YouTube";
+            }
         } else {
-            video.classList.remove('hidden'); video.style.zIndex = "20";
-            ytDiv.classList.add('hidden'); ytDiv.style.zIndex = "1";
+            video.classList.remove('hidden');
+            ytDiv.classList.add('hidden');
+            
             if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+            
             if (data.url.includes('.m3u8')) {
                 hls.destroy(); hls = new Hls();
                 hls.loadSource(data.url); hls.attachMedia(video);
-                hls.on(Hls.Events.ERROR, () => logBox.innerText = "Error: Link Gagal Dimuat!");
-            } else { video.src = data.url; }
-            video.play();
-            logBox.innerText = "Status: Mode Link Direct Aktif";
+                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+            } else { video.src = data.url; video.play(); }
+            logBox.innerText = "Status: Memutar Link Direct";
         }
         setTimeout(() => isSyncing = false, 2000);
     }
@@ -159,8 +165,7 @@
     function sendChat() {
         const i = document.getElementById('chatInput');
         if(!i.value) return;
-        const name = document.getElementById('my-name').value;
-        socket.emit('new-message', { name, text: i.value, type: 'text' });
+        socket.emit('new-message', { name: document.getElementById('my-name').value, text: i.value, type: 'text' });
         addMsg("me", "Kamu", i.value, "text");
         i.value = "";
     }
@@ -182,7 +187,7 @@
                 };
             };
             mediaRecorder.start();
-        } catch(e) { alert("Mic tidak diijinkan"); }
+        } catch(e) { console.log("Mic error"); }
     }
 
     function stopRecord() { if(mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); document.getElementById('vnBtn').classList.remove('recording'); } }
